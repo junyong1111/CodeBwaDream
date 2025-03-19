@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Request
 
-
 router = APIRouter()
 
 # 서버 상태 체크
