@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Request
 
+from src.app.service import code_agent
+
 router = APIRouter()
 
 # 서버 상태 체크
@@ -9,6 +11,4 @@ async def health_check():
 
 @router.post("/github-webhook")
 async def github_webhook(request: Request):
-    payload = await request.json()
-    print(payload)  # GitHub 이벤트 데이터 출력 (테스트용)
-    return {"status": "Webhook received!"}
+    return code_agent.get_code_review_agent_service(request)
