@@ -11,4 +11,4 @@ async def health_check():
 
 @router.post("/github-webhook")
 async def github_webhook(request: Request):
-    return code_agent.get_code_review_agent_service(request)
+    return await code_agent.get_code_review_agent_service(request)
