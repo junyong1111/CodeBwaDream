@@ -49,126 +49,105 @@ except Exception as e:
 
 # 리뷰어 페르소나별 프롬프트 템플릿
 REVIEWER_PROMPTS = {
-    "positive": """당신은 Alex라는 10년차 시니어 개발자입니다. 코드의 우수한 부분을 구체적으로 분석하고 격려하세요.
+    "positive": """당신은 "봐"라는 10년차 시니어 개발자입니다. 변경사항의 좋은 점을 찾아 구체적으로 분석하세요.
 
+**PR 요구사항:** {requirements}
 프로젝트: {language}/{framework}, 브랜치: {branch}
-변경사항: {changed_files}개 파일, +{additions}/-{deletions} 라인
 
-파일 변경사항:
-{file_changes}
+**코드 변경 분석:**
+{diff_analysis}
 
-다음 기준으로 구체적으로 분석하세요:
+다음 관점에서 **변경된 코드만** 집중 분석하세요:
 
-**코드 품질 관점:**
-- 변수명/함수명의 가독성과 의미 전달
-- 함수 단일 책임 원칙 준수
-- 에러 핸들링과 로깅 전략
+**✅ 개선된 점:**
+- Before/After 코드 비교하여 좋아진 부분
+- 요구사항 충족도 평가
+- 코드 품질 향상 사항
 
-**아키텍처 관점:**
-- 모듈 간 의존성과 결합도
-- 확장 가능성과 유지보수성
-- 디자인 패턴 적용
+**🎯 트레이드오프 분석:**
+- 이 변경으로 얻은 이점
+- 성능/가독성 개선 효과
+- 유지보수성 향상
 
-**실제 코드 예시:**
+**💡 추가 제안:**
+- 요구사항을 더 잘 만족시키는 방법
+- 관련 개선 포인트
+
+실제 diff 코드를 인용하며 긍정적이고 격려하는 톤으로 150자 내외로 작성하세요.""",
+
+    "neutral": """당신은 "드"라는 시스템 아키텍트입니다. 변경사항을 객관적으로 분석하고 균형잡힌 의견을 제시하세요.
+
+**PR 요구사항:** {requirements}
+프로젝트: {language}/{framework}, 브랜치: {branch}
+
+**코드 변경 분석:**
+{diff_analysis}
+
+다음 기준으로 **변경된 부분만** 객관적 분석하세요:
+
+**📊 변경사항 평가:**
+- Before 코드의 문제점
+- After 코드의 개선사항
+- 요구사항 달성도 측정
+
+**⚖️ 트레이드오프:**
+- 얻은 것 vs 잃은 것
+- 복잡도 변화 분석
+- 성능 영향 평가
+
+**🔧 기술적 제안:**
 ```python
-# 좋은 예시
-async def handle_pull_request(payload):
-    # 명확한 책임 분리와 에러 핸들링
+# 현재 변경사항
+기존코드 → 새코드
+
+# 추가 고려사항
+더 나은 대안이나 보완점
 ```
 
-**구체적 칭찬 + 다음 단계:**
-- "L15의 `validate_github_private_key()` 함수명이 명확하네요"
-- "비동기 처리 패턴이 일관되게 적용되었습니다"
-- "다음에는 unit test 추가를 고려해보세요"
+**📈 메트릭스:**
+- 코드 라인 수 변화의 의미
+- 의존성 변화 영향도
 
-격려하는 톤으로 180자 내외, 실제 코드를 인용하며 작성하세요.""",
+중립적이고 분석적인 톤으로 150자 내외, diff 코드를 구체적으로 인용하여 작성하세요.""",
 
-    "neutral": """당신은 Morgan이라는 시스템 아키텍트입니다. 코드를 기술적 관점에서 객관적으로 분석하세요.
+    "critical": """당신은 "림"이라는 코드 품질 전문가입니다. 변경사항의 문제점과 위험요소를 엄격하게 지적하세요.
 
+**PR 요구사항:** {requirements}
 프로젝트: {language}/{framework}, 브랜치: {branch}
-변경사항: {changed_files}개 파일, +{additions}/-{deletions} 라인
 
-파일 변경사항:
-{file_changes}
+**코드 변경 분석:**
+{diff_analysis}
 
-다음 기준으로 객관적 분석하세요:
+다음 위험요소를 **변경된 코드 중심**으로 엄격히 검토하세요:
 
-**코드 구조 분석:**
-- 순환 복잡도 (Cyclomatic Complexity)
-- 함수/클래스 크기와 응집도
-- SOLID 원칙 준수도
+**🚨 문제점 분석:**
+- Before → After 변경으로 생긴 새로운 위험
+- 요구사항 미충족 부분
+- 잠재적 버그나 side effect
 
-**성능 분석:**
-- 비동기 처리 효율성
-- 메모리 사용 패턴
-- I/O 최적화 여부
+**⚠️ 트레이드오프 문제:**
+- 이 변경의 숨겨진 비용
+- 기술부채 증가 가능성
+- 다른 모듈에 미치는 영향
 
-**기술 부채 평가:**
-- 코드 중복도
-- 하드코딩된 값들
-- 의존성 관리
-
-**구체적 개선 제안:**
+**🔥 Critical Issues:**
 ```python
-# 현재
-llm = ChatOpenAI() if OPENAI_API_KEY else None
+# 문제가 있는 변경
+- 기존: safe_code()
++ 신규: risky_code()
 
-# 제안
-@lru_cache(maxsize=1)
-def get_llm_instance():
-    return ChatOpenAI() if OPENAI_API_KEY else None
+# 위험 요소
+1. 에러 핸들링 부족
+2. 성능 저하 우려
+3. 보안 취약점
 ```
 
-**메트릭스 기반 제안:**
-- "함수 길이 20라인 초과 시 분리 고려"
-- "중복 로직 3회 이상 발견 시 공통 모듈화"
+**❌ 즉시 수정 필요:**
+- 구체적인 코드 라인과 문제점
+- 반드시 해결해야 할 이유
+- 대안 제시
 
-기술적이고 객관적인 톤으로 180자 내외, 실제 개선 코드와 함께 작성하세요.""",
-
-    "critical": """당신은 Jordan이라는 보안/성능 전문가입니다. 잠재적 위험과 품질 문제를 엄격하게 검토하세요.
-
-프로젝트: {language}/{framework}, 브랜치: {branch}
-변경사항: {changed_files}개 파일, +{additions}/-{deletions} 라인
-
-파일 변경사항:
-{file_changes}
-
-다음 위험 요소를 엄격히 검토하세요:
-
-**보안 취약점:**
-- JWT 토큰 검증 로직
-- API 키 노출 위험
-- 입력 데이터 검증 누락
-- OWASP Top 10 기준 점검
-
-**성능/안정성 문제:**
-- 메모리 누수 가능성
-- 무한 루프나 재귀 위험
-- Rate limiting 부재
-- Exception handling 미흡
-
-**운영 관점:**
-- 로그 레벨과 민감정보 노출
-- 모니터링과 알림 설정
-- 장애 복구 시나리오
-
-**Critical Issues:**
-```python
-# 문제: 하드코딩된 타임아웃
-async with httpx.AsyncClient() as client:
-    response = await client.post(url)
-
-# 해결: 설정 가능한 타임아웃
-async with httpx.AsyncClient(timeout=30.0) as client:
-    response = await client.post(url)
-```
-
-**즉시 수정 필요:**
-- "L25: API 키 노출 위험 - 환경변수 검증 로직 추가"
-- "L67: 예외 처리 범위 너무 광범위 - 구체적 예외 타입 지정"
-- "L89: SQL injection 가능성 - parameterized query 사용"
-
-엄격하고 직설적인 톤으로 180자 내외, 실제 위험 코드와 해결책을 제시하세요."""
+비판적이고 엄격한 톤으로 150자 내외, 실제 diff의 문제 코드를 정확히 지적하여 작성하세요."""
 }
 
 def validate_github_private_key():
@@ -328,8 +307,8 @@ async def get_file_content(repo_name, file_path, token, sha=None):
         _LOGGER.error(f"파일 내용 가져오기 실패 {file_path}: {str(e)}")
         return None
 
-async def analyze_files_with_ai(files, project_info, repo_name, token):
-    """AI를 활용하여 변경된 파일들을 분석"""
+async def analyze_files_with_ai(files, project_info, repo_name, token, requirements):
+    """요구사항 기반 Diff 중심 AI 분석"""
     if not llm:
         return {
             "positive": "✅ AI 분석을 위한 OpenAI API 키가 설정되지 않았습니다.",
@@ -337,88 +316,20 @@ async def analyze_files_with_ai(files, project_info, repo_name, token):
             "critical": "⚠️ AI 코드 분석이 비활성화되어 있습니다."
         }
 
-    # 파일별 상세 분석 - 시니어급 관점
-    file_changes = []
+    # Diff 변경사항 상세 분석
+    diff_analysis = analyze_diff_changes(files)
 
-    for file in files[:5]:  # 최대 5개 파일 분석
-        filename = file.get("filename", "")
-        patch = file.get("patch", "")
-        additions = file.get("additions", 0)
-        deletions = file.get("deletions", 0)
-        status = file.get("status", "modified")
-
-        if filename.endswith((".py", ".js", ".ts", ".java", ".go", ".rs", ".cpp", ".c")):
-            # 코드 품질 지표 분석
-            analysis_points = {
-                "functions": [],
-                "imports": [],
-                "classes": [],
-                "security_risks": [],
-                "performance_issues": [],
-                "architecture_patterns": []
-            }
-
-            # 패치에서 중요한 변경사항 추출
-            for line_num, line in enumerate(patch.split('\n')[:50], 1):
-                line = line.strip()
-
-                # 함수/메서드 정의
-                if any(pattern in line for pattern in ['+def ', '+async def', '+function ', '+class ']):
-                    analysis_points["functions"].append(f"L{line_num}: {line[:80]}")
-
-                # Import/의존성 변경
-                elif any(pattern in line for pattern in ['+import ', '+from ', '+require(', '+#include']):
-                    analysis_points["imports"].append(f"L{line_num}: {line[:60]}")
-
-                # 보안 관련 패턴
-                elif any(pattern in line.lower() for pattern in ['password', 'secret', 'key', 'token', 'auth']):
-                    analysis_points["security_risks"].append(f"L{line_num}: {line[:60]}")
-
-                # 성능 관련 패턴
-                elif any(pattern in line for pattern in ['for ', 'while ', 'async ', 'await ', 'query', 'database']):
-                    analysis_points["performance_issues"].append(f"L{line_num}: {line[:60]}")
-
-            # 구체적인 분석 결과 생성
-            file_summary = f"""
-**📁 {filename}** ({status}, +{additions}/-{deletions})
-
-**🔧 주요 변경사항:**
-{chr(10).join(analysis_points["functions"][:3]) if analysis_points["functions"] else "- 함수 정의 변경 없음"}
-
-**📦 의존성/Import:**
-{chr(10).join(analysis_points["imports"][:3]) if analysis_points["imports"] else "- Import 변경 없음"}
-
-**⚠️ 주의사항:**
-{chr(10).join(analysis_points["security_risks"][:2]) if analysis_points["security_risks"] else "- 보안 관련 변경 없음"}
-
-**⚡ 성능 고려사항:**
-{chr(10).join(analysis_points["performance_issues"][:2]) if analysis_points["performance_issues"] else "- 성능 관련 변경 없음"}
-"""
-            file_changes.append(file_summary)
-
-    # 전체 변경사항이 없으면 기본 메시지
-    if not file_changes:
-        file_changes_text = """
-**분석 결과:** 코드 파일 변경사항이 감지되지 않았습니다.
-- 문서 파일이나 설정 파일만 변경되었을 수 있습니다.
-- 바이너리 파일이나 대용량 파일은 분석에서 제외됩니다.
-"""
-    else:
-        file_changes_text = "\n".join(file_changes)
-
-    # 각 리뷰어별 AI 분석
+    # 각 리뷰어별 AI 분석 (요구사항 + diff 중심)
     ai_reviews = {}
 
     for reviewer_type, prompt_template in REVIEWER_PROMPTS.items():
         try:
             prompt = prompt_template.format(
+                requirements=requirements,
                 language=project_info["language"],
                 framework=project_info["framework"],
                 branch=project_info["branch"],
-                changed_files=project_info["changes"]["changed_files"],
-                additions=project_info["changes"]["additions"],
-                deletions=project_info["changes"]["deletions"],
-                file_changes=file_changes_text
+                diff_analysis=diff_analysis
             )
 
             response = await llm.ainvoke([SystemMessage(content=prompt)])
@@ -431,15 +342,15 @@ async def analyze_files_with_ai(files, project_info, repo_name, token):
     return ai_reviews
 
 # 3명의 리뷰어 페르소나 정의 (AI 강화 버전)
-async def generate_reviewer_feedback_with_ai(project_info, files, repo_name, token):
+async def generate_reviewer_feedback_with_ai(project_info, files, repo_name, token, requirements):
     """AI를 활용한 3명의 리뷰어(긍정, 중립, 부정) 피드백 생성 - 시니어급"""
     language = project_info["language"]
     framework = project_info["framework"]
     changes = project_info["changes"]
     branch = project_info["branch"]
 
-    # AI 분석 실행
-    ai_reviews = await analyze_files_with_ai(files, project_info, repo_name, token)
+    # AI 분석 실행 (요구사항 포함)
+    ai_reviews = await analyze_files_with_ai(files, project_info, repo_name, token, requirements)
 
     # 📊 변경사항 요약
     change_summary = f"""
@@ -450,71 +361,58 @@ async def generate_reviewer_feedback_with_ai(project_info, files, repo_name, tok
 - **커밋:** {changes['commits']}개
 """
 
-    # 🌟 Alex (긍정적 리뷰어) - 시니어급 격려
-    positive_review = f"""## 🌟 Alex (시니어 개발자)
+    # 🌟 "봐" (긍정적 리뷰어) - 시니어급 격려
+    positive_review = f"""## 🌟 "봐" (시니어 개발자)
 {ai_reviews['positive']}
 
 {change_summary}
 
 **🎯 좋은 점:**
-- 코드 구조와 명명 규칙이 일관성 있게 적용됨
-- 비동기 처리 패턴이 적절히 사용됨
-- 에러 핸들링 로직이 체계적으로 구현됨
+- 요구사항 반영이 체계적으로 이루어짐
+- Before → After 변경이 논리적으로 구성됨
+- 코드 품질과 가독성이 향상됨
 
 **🚀 Next Steps:**
-- Unit test coverage 검토
+- 추가 테스트 케이스 검토
 - 성능 최적화 포인트 확인
-- 문서화 완성도 체크"""
+- 문서화 업데이트 검토"""
 
-    # ⚖️ Morgan (중립적 리뷰어) - 아키텍트급 분석
-    neutral_review = f"""## ⚖️ Morgan (시스템 아키텍트)
+    # ⚖️ "드" (중립적 리뷰어) - 아키텍트급 분석
+    neutral_review = f"""## ⚖️ "드" (시스템 아키텍트)
 {ai_reviews['neutral']}
 
 {change_summary}
 
-**📐 기술적 분석:**
-- **복잡도:** 적정 수준 (함수당 평균 15-20라인)
-- **결합도:** 낮음 (모듈 간 의존성 최소화)
-- **응집도:** 높음 (단일 책임 원칙 준수)
+**📐 트레이드오프 분석:**
+- **얻은 것:** 요구사항 충족, 코드 개선
+- **잃은 것:** 복잡도 증가 가능성
+- **영향도:** 다른 모듈에 미치는 파급효과
 
-**🔧 개선 제안:**
-```python
-# 성능 최적화 예시
-@lru_cache(maxsize=128)
-def get_cached_result():
-    return expensive_operation()
-```
+**🔧 기술적 제안:**
+- diff 변경사항의 장기적 영향 검토
+- 성능 벤치마크 필요성 평가
+- 아키텍처 일관성 유지 확인"""
 
-**📈 메트릭스:**
-- 코드 중복도: 5% 미만 (양호)
-- 순환 복잡도: 3-5 (적정)"""
-
-    # 🔍 Jordan (비판적 리뷰어) - 보안 전문가급
-    critical_review = f"""## 🔍 Jordan (보안/성능 전문가)
+    # 🔍 "림" (비판적 리뷰어) - 보안 전문가급
+    critical_review = f"""## 🔍 "림" (코드 품질 전문가)
 {ai_reviews['critical']}
 
 {change_summary}
 
 **🚨 Critical Issues:**
-- **보안:** JWT 토큰 유효성 검증 강화 필요
-- **성능:** API 호출 timeout 설정 누락
-- **안정성:** Exception 처리 범위 구체화 필요
+- 요구사항 미반영 부분 존재 여부
+- Before → After 변경으로 인한 잠재적 위험
+- 예외 처리 및 edge case 고려 부족
 
 **⚡ 즉시 수정 권장:**
-```python
-# Before (위험)
-token = jwt.encode(payload, key)
+- diff에서 발견된 보안 취약점 해결
+- 성능 저하 요소 개선
+- 코드 품질 표준 준수 확인
 
-# After (안전)
-token = jwt.encode(payload, key, algorithm="RS256")
-if not verify_token(token):
-    raise SecurityError("Invalid token")
-```
-
-**🛡️ 보안 체크리스트:**
-- [ ] Input validation 추가
-- [ ] Rate limiting 구현
-- [ ] 로그 민감정보 마스킹"""
+**🛡️ 필수 체크리스트:**
+- [ ] 요구사항 100% 반영 확인
+- [ ] 보안 취약점 제거
+- [ ] 성능 테스트 통과"""
 
     return {
         "positive": positive_review,
@@ -522,30 +420,40 @@ if not verify_token(token):
         "critical": critical_review
     }
 
-# 향상된 코드 리뷰 작성
-async def create_code_review(repo_name, pr_number, files, token, project_info):
+# 요구사항 기반 코드 리뷰 작성 (신규)
+async def create_code_review_with_requirements(repo_name, pr_number, files, token, project_info, requirements):
+    """요구사항 기반 Diff 중심 코드 리뷰 작성"""
     url = f"https://api.github.com/repos/{repo_name}/pulls/{pr_number}/reviews"
     headers = {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3+json"
     }
 
-    # 3명의 리뷰어 피드백 생성
-    feedback = await generate_reviewer_feedback_with_ai(project_info, files, repo_name, token)
+    # 🎯 요구사항 기반 3명의 리뷰어 피드백 생성
+    feedback = await generate_reviewer_feedback_with_ai(project_info, files, repo_name, token, requirements)
 
-    # 전체 리뷰 본문 작성
-    review_body = f"""# 🤖 Senior-Level Code Review
+    # Diff 변경사항 분석
+    diff_summary = analyze_diff_changes(files)
 
-> **자동 코드 리뷰 v2.0** - AI 기반 3인 리뷰어 분석 결과
+    # 📍 실제 변경된 라인별 인라인 코멘트 생성 (신규!)
+    line_comments = parse_diff_and_get_line_comments(files, feedback)
+    _LOGGER.info(f"생성된 인라인 코멘트 수: {len(line_comments)}개")
 
-## 📋 Pull Request 개요
+    # 전체 리뷰 본문 작성 (요약용)
+    review_body = f"""# 🎯 요구사항 기반 Code Review
+
+> **PR 요구사항:** {requirements}
+
+## 📋 변경사항 개요
 
 | 항목 | 내용 |
 |------|------|
 | **언어/프레임워크** | {project_info['language']} / {project_info['framework']} |
 | **브랜치** | `{project_info['branch']}` |
 | **변경사항** | {project_info['changes']['changed_files']}개 파일, +{project_info['changes']['additions']}/-{project_info['changes']['deletions']} 라인 |
-| **커밋수** | {project_info['changes']['commits']}개 |
+
+## 🔄 Diff 분석 결과
+{diff_summary}
 
 ---
 
@@ -561,49 +469,39 @@ async def create_code_review(repo_name, pr_number, files, token, project_info):
 
 ---
 
-## 🎯 종합 결론
+## 🎯 요구사항 충족도 평가
 
-### ✅ **Approve 조건:**
+### ✅ **승인 기준:**
+- [ ] 요구사항 100% 반영 완료
 - [ ] Critical Issues 해결 완료
-- [ ] 보안 취약점 점검 완료
-- [ ] 성능 테스트 통과
-- [ ] 단위 테스트 작성/업데이트
+- [ ] Before → After 변경사항의 타당성 확인
+- [ ] 트레이드오프 분석 및 수용 가능성 검토
 
-### 📝 **추천 Actions:**
-1. **우선순위 High:** 보안 관련 수정사항 적용
-2. **우선순위 Medium:** 성능 최적화 검토
-3. **우선순위 Low:** 코드 문서화 및 리팩토링
+### 📝 **Action Items:**
+1. **High:** 요구사항 미반영 부분 수정
+2. **Medium:** 성능/보안 이슈 해결
+3. **Low:** 코드 품질 및 문서화 개선
 
 ---
 
-*🔬 이 리뷰는 GPT-4o-mini 기반 AI 시스템에 의해 생성되었습니다.*
-*📧 추가 문의: 시니어 개발자에게 직접 문의하세요.*"""
+*🔬 각 변경된 라인에 봐/드/림 리뷰어들의 상세 코멘트가 달렸습니다.*
+*📧 인라인 코멘트를 확인하여 구체적인 피드백을 받아보세요.*"""
 
-    # 파일별 코멘트 생성
-    comments = []
-    for file in files[:3]:  # 최대 3개 파일에만 코멘트
-        filename = file.get("filename", "")
-        if filename.endswith((".py", ".js", ".ts", ".java")):
-            comments.append({
-                "path": filename,
-                "position": 1,
-                "body": f"📝 **{filename}** 파일이 수정되었습니다. {project_info['language']} 코딩 표준을 준수했는지 확인해주세요."
-            })
-
+    # GitHub API 리뷰 데이터 (인라인 코멘트 포함)
     review_data = {
         "body": review_body,
         "event": "COMMENT",
-        "comments": comments
+        "comments": line_comments  # 실제 diff 라인별 코멘트!
     }
 
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, headers=headers, json=review_data)
             response.raise_for_status()
-            _LOGGER.info(f"PR #{pr_number}에 3명 리뷰어 피드백 작성 완료")
+            _LOGGER.info(f"PR #{pr_number}에 요구사항 기반 봐/드/림 리뷰 작성 완료")
             return True
     except Exception as e:
-        _LOGGER.error(f"리뷰 작성 실패: {str(e)}")
+        _LOGGER.error(f"요구사항 기반 리뷰 작성 실패: {str(e)}")
         return False
 
 def verify_webhook_signature(payload_body, signature_header, secret):
@@ -620,6 +518,10 @@ def verify_webhook_signature(payload_body, signature_header, secret):
 async def handle_pull_request(payload):
     try:
         _LOGGER.info("풀 리퀘스트 이벤트 처리 시작")
+
+        # 🎯 PR 요구사항 추출 (신규)
+        requirements = extract_requirements_from_pr(payload)
+        _LOGGER.info(f"추출된 요구사항: {requirements}")
 
         # 프로젝트 정보 분석
         project_info = analyze_project_info(payload)
@@ -643,11 +545,13 @@ async def handle_pull_request(payload):
         files = await get_pr_files(repo_name, pr_number, token)
         _LOGGER.info(f"변경된 파일 {len(files)}개 분석 완료")
 
-        # 3명 리뷰어의 코드 리뷰 작성
-        success = await create_code_review(repo_name, pr_number, files, token, project_info)
+        # 🔄 요구사항 기반 Diff 중심 코드 리뷰 작성 (신규)
+        success = await create_code_review_with_requirements(
+            repo_name, pr_number, files, token, project_info, requirements
+        )
 
         if success:
-            _LOGGER.info("3명 리뷰어 피드백 작성 성공")
+            _LOGGER.info("봐/드/림 리뷰어 피드백 작성 성공")
         else:
             _LOGGER.error("리뷰 작성 실패")
 
@@ -710,3 +614,185 @@ async def post_simple_comment(repo_name, pr_number, token, message):
     except Exception as e:
         _LOGGER.error(f"알림 코멘트 작성 실패: {str(e)}")
         return False
+
+def extract_requirements_from_pr(payload):
+    """PR 제목, 본문, 코멘트에서 요구사항 추출"""
+    pr = payload.get("pull_request", {})
+
+    # PR 제목과 본문에서 요구사항 키워드 찾기
+    title = pr.get("title", "")
+    body = pr.get("body", "") or ""
+
+    # 요구사항 관련 키워드들
+    requirement_keywords = [
+        "요구사항", "requirement", "구현", "implement", "추가", "add",
+        "수정", "fix", "개선", "improve", "변경", "change", "기능", "feature",
+        "버그", "bug", "이슈", "issue", "문제", "problem"
+    ]
+
+    # 요구사항 문장 추출
+    requirements = []
+
+    # 제목에서 추출
+    if any(keyword in title.lower() for keyword in requirement_keywords):
+        requirements.append(f"📋 **제목:** {title}")
+
+    # 본문에서 요구사항 추출 (라인별로)
+    if body:
+        body_lines = body.split('\n')
+        for line in body_lines[:10]:  # 처음 10줄만 체크
+            line = line.strip()
+            if line and any(keyword in line.lower() for keyword in requirement_keywords):
+                requirements.append(f"📝 **설명:** {line[:100]}")
+
+    # 요구사항이 없으면 기본값
+    if not requirements:
+        requirements = [f"📋 **기본 작업:** {title}"]
+
+    return " | ".join(requirements[:3])  # 최대 3개만
+
+def analyze_diff_changes(files):
+    """파일별 diff 변경사항을 Before/After로 상세 분석"""
+    diff_analysis = []
+
+    for file in files[:3]:  # 최대 3개 파일만 분석
+        filename = file.get("filename", "")
+        patch = file.get("patch", "")
+        additions = file.get("additions", 0)
+        deletions = file.get("deletions", 0)
+        status = file.get("status", "modified")
+
+        if not patch:
+            continue
+
+        # diff를 라인별로 분석
+        before_lines = []
+        after_lines = []
+        context_lines = []
+
+        for line in patch.split('\n')[:30]:  # 최대 30라인
+            if line.startswith('-') and not line.startswith('---'):
+                before_lines.append(line[1:].strip())
+            elif line.startswith('+') and not line.startswith('+++'):
+                after_lines.append(line[1:].strip())
+            elif not line.startswith('@@') and not line.startswith('+++') and not line.startswith('---'):
+                context_lines.append(line.strip())
+
+        # 중요한 변경사항만 필터링
+        important_before = [line for line in before_lines[:5]
+                           if any(keyword in line for keyword in ['def ', 'class ', 'import ', 'return ', 'if ', 'async '])]
+        important_after = [line for line in after_lines[:5]
+                          if any(keyword in line for keyword in ['def ', 'class ', 'import ', 'return ', 'if ', 'async '])]
+
+        # 파일별 diff 분석 결과
+        file_diff = f"""
+### 📁 **{filename}** ({status}, +{additions}/-{deletions})
+
+**🔴 Before (제거됨):**
+```python
+{chr(10).join(important_before) if important_before else "- 중요한 제거 사항 없음"}
+```
+
+**🟢 After (추가됨):**
+```python
+{chr(10).join(important_after) if important_after else "- 중요한 추가 사항 없음"}
+```
+
+**🔄 변경 요약:**
+- 제거: {len(before_lines)}라인 | 추가: {len(after_lines)}라인
+- 주요변경: {"함수/클래스 정의" if any("def " in line or "class " in line for line in important_after) else "로직 수정"}
+"""
+        diff_analysis.append(file_diff)
+
+    return "\n".join(diff_analysis) if diff_analysis else """
+**📄 변경사항:** 분석 가능한 diff가 없습니다.
+- 바이너리 파일이거나 변경사항이 미미할 수 있습니다.
+- 설정 파일이나 문서 변경일 가능성이 있습니다.
+"""
+
+def parse_diff_and_get_line_comments(files, ai_reviews):
+    """diff를 파싱해서 실제 변경된 라인에 달 코멘트들을 생성"""
+    line_comments = []
+
+    for file in files[:3]:  # 최대 3개 파일만
+        filename = file.get("filename", "")
+        patch = file.get("patch", "")
+
+        if not patch or not filename.endswith((".py", ".js", ".ts", ".java", ".go")):
+            continue
+
+        # diff 헤더에서 라인 정보 파싱
+        lines = patch.split('\n')
+        current_line_number = None
+
+        for i, line in enumerate(lines):
+            # @@ -old_start,old_count +new_start,new_count @@ 형태 파싱
+            if line.startswith('@@'):
+                # 예: @@ -49,50 +49,126 @@ def load_private_key_safely():
+                import re
+                match = re.search(r'\+(\d+)', line)
+                if match:
+                    current_line_number = int(match.group(1))
+                continue
+
+            # 실제 변경된 라인들 분석
+            if line.startswith('+') and not line.startswith('+++'):
+                added_line = line[1:]  # + 제거
+
+                # 중요한 변경사항만 코멘트 달기
+                if any(keyword in added_line for keyword in ['def ', 'class ', 'async ', 'await ', 'import ', 'from ']):
+
+                    # 봐/드/림 중 하나를 랜덤하게 선택해서 해당 라인에 코멘트
+                    reviewer_type = ["positive", "neutral", "critical"][i % 3]
+                    reviewer_name = {"positive": "봐", "neutral": "드", "critical": "림"}[reviewer_type]
+
+                    # 라인별 맞춤 코멘트 생성
+                    if 'def ' in added_line or 'async def' in added_line:
+                        if reviewer_type == "positive":
+                            comment = f"🌟 **{reviewer_name}**: 함수 정의가 명확하네요! `{added_line.strip()[:50]}...` 좋은 네이밍입니다."
+                        elif reviewer_type == "neutral":
+                            comment = f"⚖️ **{reviewer_name}**: 함수 복잡도를 고려해보세요. `{added_line.strip()[:50]}...` 단일 책임 원칙은 지켜지고 있나요?"
+                        else:
+                            comment = f"🔍 **{reviewer_name}**: 에러 핸들링이 빠졌습니다. `{added_line.strip()[:50]}...` try-catch 블록 필요해요."
+
+                    elif 'import ' in added_line or 'from ' in added_line:
+                        if reviewer_type == "positive":
+                            comment = f"🌟 **{reviewer_name}**: 필요한 라이브러리 추가 좋습니다! `{added_line.strip()}`"
+                        elif reviewer_type == "neutral":
+                            comment = f"⚖️ **{reviewer_name}**: 의존성 추가 영향도를 검토하세요. `{added_line.strip()}`"
+                        else:
+                            comment = f"🔍 **{reviewer_name}**: 불필요한 import는 아닌지 확인하세요. `{added_line.strip()}`"
+
+                    elif 'await ' in added_line:
+                        if reviewer_type == "positive":
+                            comment = f"🌟 **{reviewer_name}**: 비동기 처리 잘 적용했네요! `{added_line.strip()[:50]}...`"
+                        elif reviewer_type == "neutral":
+                            comment = f"⚖️ **{reviewer_name}**: await 사용 적절한가요? `{added_line.strip()[:50]}...` 성능 영향 체크하세요."
+                        else:
+                            comment = f"🔍 **{reviewer_name}**: await 에러 처리 누락! `{added_line.strip()[:50]}...` 예외 상황 고려하세요."
+
+                    else:
+                        # 일반적인 변경사항
+                        if reviewer_type == "positive":
+                            comment = f"🌟 **{reviewer_name}**: 코드 개선이 보이네요! `{added_line.strip()[:40]}...`"
+                        elif reviewer_type == "neutral":
+                            comment = f"⚖️ **{reviewer_name}**: 변경사항 검토: `{added_line.strip()[:40]}...` 사이드 이펙트는 없나요?"
+                        else:
+                            comment = f"🔍 **{reviewer_name}**: 이 변경이 정말 필요한가요? `{added_line.strip()[:40]}...`"
+
+                    # GitHub API용 코멘트 데이터 생성
+                    line_comments.append({
+                        "path": filename,
+                        "line": current_line_number if current_line_number else 1,
+                        "body": comment
+                    })
+
+                # 라인 번호 증가
+                if current_line_number:
+                    current_line_number += 1
+
+            elif line.startswith(' '):  # 컨텍스트 라인
+                if current_line_number:
+                    current_line_number += 1
+
+    return line_comments
