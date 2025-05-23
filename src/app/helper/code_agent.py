@@ -47,48 +47,53 @@ except Exception as e:
     _LOGGER.warning(f"OpenAI 초기화 실패: {str(e)}")
     llm = None
 
-# 클린코드 기반 리뷰어 프롬프트
-REVIEWER_PROMPTS = {
-    "positive": """당신은 격려(클린코드 전문가)입니다. 변경사항에서 클린코드 원칙이 잘 적용된 부분을 찾아 구체적으로 칭찬하세요.
+# 클린코드 기반 리뷰어 프롬프트 - AI가 언어별로 동적 분석
+def get_dynamic_reviewer_prompts(language, framework):
+    """AI가 언어/프레임워크별 동적 분석하도록 프롬프트 생성"""
 
-**요구사항:** {requirements}
-**변경 분석:** {diff_analysis}
+    return {
+        "positive": f"""당신은 "격려" 리뷰어입니다.
 
-다음 클린코드 관점에서 분석 (30자 내외):
-✅ SOLID 원칙 준수도
-✅ DRY (중복 제거) 적용
-✅ 의미있는 네이밍
-✅ 함수 책임의 명확성
+**언어/프레임워크**: {language}/{framework}
+**요구사항**: {{requirements}}
+**실제 변경된 코드**:
+{{diff_analysis}}
 
-예시: "함수명이 의도를 명확히 표현함. 예시: calculate_total() → 계산 목적 명확"
+위 {language}/{framework} 코드 변경사항을 분석해서 **잘한 부분을 구체적으로 칭찬**하세요.
+- {language}의 모범사례와 {framework}의 패턴 활용도 평가
+- 실제 코드 라인을 인용하여 구체적 예시 포함
+- 30자 내외로 간결하게 작성
+- "예시: 함수명이 명확함 → getUserInfo()" 형태로 구체적 예시 필수
 """,
 
-    "neutral": """당신은 분석(리팩토링 전문가)입니다. 변경사항을 클린코드 관점에서 객관적으로 분석하세요.
+        "neutral": f"""당신은 "분석" 리뷰어입니다.
 
-**요구사항:** {requirements}
-**변경 분석:** {diff_analysis}
+**언어/프레임워크**: {language}/{framework}
+**요구사항**: {{requirements}}
+**실제 변경된 코드**:
+{{diff_analysis}}
 
-다음 관점에서 균형잡힌 분석 (30자 내외):
-⚖️ 코드 복잡도 vs 가독성
-⚖️ 성능 vs 유지보수성
-⚖️ 추상화 vs 구체성
-
-예시: "가독성은 향상됐지만 복잡도 증가. 예시: 함수 분리 고려"
+위 {language}/{framework} 코드 변경사항의 **트레이드오프를 객관적 분석**하세요.
+- {language} 언어 특성과 {framework} 설계 원칙 관점에서 평가
+- 성능 vs 가독성, 복잡도 vs 유지보수성 등 균형점 분석
+- 30자 내외로 간결하게 작성
+- "예시: 함수 분리로 가독성↑ 성능↓" 형태로 구체적 예시 필수
 """,
 
-    "critical": """당신은 지적(코드 품질 감시자)입니다. 클린코드 원칙 위반 사항을 엄격히 지적하세요.
+        "critical": f"""당신은 "지적" 리뷰어입니다.
 
-**요구사항:** {requirements}
-**변경 분석:** {diff_analysis}
+**언어/프레임워크**: {language}/{framework}
+**요구사항**: {{requirements}}
+**실제 변경된 코드**:
+{{diff_analysis}}
 
-다음 클린코드 위반사항 점검 (30자 내외):
-🚨 Long Method (함수가 너무 긴가?)
-🚨 Magic Number (의미없는 숫자 사용)
-🚨 Poor Naming (의미불명한 변수/함수명)
-
-예시: "35라인 함수는 너무 김. 예시: 3개 함수로 분리 필요"
+위 {language}/{framework} 코드에서 **개선이 필요한 부분을 엄격히 지적**하세요.
+- {language} 모범사례 위반과 {framework} 안티패턴 감지
+- 실제 코드를 인용하여 구체적 개선 방안 제시
+- 30자 내외로 간결하게 작성
+- "예시: 50라인 함수 → 3개로 분리 필요" 형태로 구체적 예시 필수
 """
-}
+    }
 
 def validate_github_private_key():
     """GitHub App Private Key 형식을 검증하고 정보를 출력"""
@@ -247,6 +252,104 @@ async def get_file_content(repo_name, file_path, token, sha=None):
         _LOGGER.error(f"파일 내용 가져오기 실패 {file_path}: {str(e)}")
         return None
 
+def analyze_diff_content(files, language, framework):
+    """실제 diff 내용을 간단하게 정리 - AI가 분석하도록"""
+    diff_analysis = []
+
+    for file in files[:3]:  # 최대 3개 파일
+        filename = file.get("filename", "")
+        patch = file.get("patch", "")
+        additions = file.get("additions", 0)
+        deletions = file.get("deletions", 0)
+
+        if not patch:
+            continue
+
+        # 실제 언어와 프레임워크 감지
+        actual_language = detect_language_from_file(filename)
+        actual_framework = detect_framework_from_patch(patch, actual_language)
+
+        # diff의 핵심 변경사항만 추출 (+ 라인들)
+        added_lines = []
+        for line in patch.split('\n'):
+            if line.startswith('+') and not line.startswith('+++'):
+                code_line = line[1:].strip()
+                if code_line and not code_line.startswith('#') and not code_line.startswith('//'):
+                    added_lines.append(code_line)
+
+        # 파일별 요약
+        file_summary = f"""**{filename}** ({actual_language}/{actual_framework}) (+{additions}/-{deletions}):
+주요 변경사항:
+{chr(10).join(added_lines[:5])}"""  # 최대 5개 라인만
+
+        diff_analysis.append(file_summary)
+
+    return "\n\n".join(diff_analysis) if diff_analysis else "변경사항 분석 결과가 없습니다."
+
+def detect_language_from_file(filename):
+    """파일 확장자로 언어 감지"""
+    extension_map = {
+        '.py': 'Python',
+        '.java': 'Java',
+        '.kt': 'Kotlin',
+        '.js': 'JavaScript',
+        '.jsx': 'JavaScript',
+        '.ts': 'TypeScript',
+        '.tsx': 'TypeScript',
+        '.dart': 'Dart',
+        '.go': 'Go',
+        '.rs': 'Rust',
+        '.cpp': 'C++',
+        '.c': 'C',
+        '.cs': 'C#',
+        '.php': 'PHP',
+        '.rb': 'Ruby',
+        '.swift': 'Swift'
+    }
+
+    for ext, lang in extension_map.items():
+        if filename.endswith(ext):
+            return lang
+    return 'Unknown'
+
+def detect_framework_from_patch(patch, language):
+    """패치 내용으로 프레임워크 감지"""
+    patch_lower = patch.lower()
+
+    if language == 'Python':
+        if 'fastapi' in patch_lower or '@app.' in patch_lower:
+            return 'FastAPI'
+        elif 'django' in patch_lower or 'models.Model' in patch:
+            return 'Django'
+        elif 'flask' in patch_lower or '@app.route' in patch:
+            return 'Flask'
+        return 'Python'
+
+    elif language in ['JavaScript', 'TypeScript']:
+        if 'react' in patch_lower or 'jsx' in patch_lower or 'usestate' in patch_lower:
+            return 'React'
+        elif 'vue' in patch_lower or 'computed' in patch_lower:
+            return 'Vue'
+        elif 'angular' in patch_lower or '@component' in patch_lower:
+            return 'Angular'
+        elif 'express' in patch_lower or 'app.get' in patch_lower:
+            return 'Express'
+        return 'JavaScript'
+
+    elif language == 'Java':
+        if '@springboot' in patch_lower or '@restcontroller' in patch_lower or 'springbootapplication' in patch_lower:
+            return 'Spring Boot'
+        elif '@controller' in patch_lower or '@service' in patch_lower:
+            return 'Spring'
+        return 'Java'
+
+    elif language == 'Dart':
+        if 'flutter' in patch_lower or 'widget' in patch_lower or 'statelesswidget' in patch_lower:
+            return 'Flutter'
+        return 'Dart'
+
+    return language
+
 async def analyze_files_with_ai(files, project_info, repo_name, token, requirements):
     """AI를 활용하여 변경된 파일들을 분석"""
     if not llm:
@@ -256,89 +359,24 @@ async def analyze_files_with_ai(files, project_info, repo_name, token, requireme
             "critical": "⚠️ AI 코드 분석이 비활성화되어 있습니다."
         }
 
-    # 파일별 상세 분석 - 시니어급 관점
-    file_changes = []
-
-    for file in files[:5]:  # 최대 5개 파일 분석
-        filename = file.get("filename", "")
-        patch = file.get("patch", "")
-        additions = file.get("additions", 0)
-        deletions = file.get("deletions", 0)
-        status = file.get("status", "modified")
-
-        if filename.endswith((".py", ".js", ".ts", ".java", ".go", ".rs", ".cpp", ".c")):
-            # 코드 품질 지표 분석
-            analysis_points = {
-                "functions": [],
-                "imports": [],
-                "classes": [],
-                "security_risks": [],
-                "performance_issues": [],
-                "architecture_patterns": []
-            }
-
-            # 패치에서 중요한 변경사항 추출
-            for line_num, line in enumerate(patch.split('\n')[:50], 1):
-                line = line.strip()
-
-                # 함수/메서드 정의
-                if any(pattern in line for pattern in ['+def ', '+async def', '+function ', '+class ']):
-                    analysis_points["functions"].append(f"L{line_num}: {line[:80]}")
-
-                # Import/의존성 변경
-                elif any(pattern in line for pattern in ['+import ', '+from ', '+require(', '+#include']):
-                    analysis_points["imports"].append(f"L{line_num}: {line[:60]}")
-
-                # 보안 관련 패턴
-                elif any(pattern in line.lower() for pattern in ['password', 'secret', 'key', 'token', 'auth']):
-                    analysis_points["security_risks"].append(f"L{line_num}: {line[:60]}")
-
-                # 성능 관련 패턴
-                elif any(pattern in line for pattern in ['for ', 'while ', 'async ', 'await ', 'query', 'database']):
-                    analysis_points["performance_issues"].append(f"L{line_num}: {line[:60]}")
-
-            # 구체적인 분석 결과 생성
-            file_summary = f"""
-**📁 {filename}** ({status}, +{additions}/-{deletions})
-
-**🔧 주요 변경사항:**
-{chr(10).join(analysis_points["functions"][:3]) if analysis_points["functions"] else "- 함수 정의 변경 없음"}
-
-**📦 의존성/Import:**
-{chr(10).join(analysis_points["imports"][:3]) if analysis_points["imports"] else "- Import 변경 없음"}
-
-**⚠️ 주의사항:**
-{chr(10).join(analysis_points["security_risks"][:2]) if analysis_points["security_risks"] else "- 보안 관련 변경 없음"}
-
-**⚡ 성능 고려사항:**
-{chr(10).join(analysis_points["performance_issues"][:2]) if analysis_points["performance_issues"] else "- 성능 관련 변경 없음"}
-"""
-            file_changes.append(file_summary)
-
-    # 전체 변경사항이 없으면 기본 메시지
-    if not file_changes:
-        file_changes_text = """
-**분석 결과:** 코드 파일 변경사항이 감지되지 않았습니다.
-- 문서 파일이나 설정 파일만 변경되었을 수 있습니다.
-- 바이너리 파일이나 대용량 파일은 분석에서 제외됩니다.
-"""
-    else:
-        file_changes_text = "\n".join(file_changes)
+    # 🎯 실제 diff 내용 상세 분석 (언어/프레임워크 특화)
+    diff_analysis = analyze_diff_content(files, project_info["language"], project_info["framework"])
+    _LOGGER.info(f"실제 diff 분석 완료: {len(diff_analysis)} 문자")
 
     # 각 리뷰어별 AI 분석
     ai_reviews = {}
 
-    for reviewer_type, prompt_template in REVIEWER_PROMPTS.items():
+    for reviewer_type, prompt_template in get_dynamic_reviewer_prompts(project_info["language"], project_info["framework"]).items():
         try:
             prompt = prompt_template.format(
+                requirements=requirements,
+                diff_analysis=diff_analysis,  # 🔥 실제 변경사항 분석 결과 전달
                 language=project_info["language"],
                 framework=project_info["framework"],
                 branch=project_info["branch"],
                 changed_files=project_info["changes"]["changed_files"],
                 additions=project_info["changes"]["additions"],
-                deletions=project_info["changes"]["deletions"],
-                file_changes=file_changes_text,
-                requirements=requirements
+                deletions=project_info["changes"]["deletions"]
             )
 
             response = await llm.ainvoke([SystemMessage(content=prompt)])
@@ -580,19 +618,26 @@ async def post_simple_comment(repo_name, pr_number, token, message):
         return False
 
 def parse_diff_and_get_line_comments(files, ai_reviews):
-    """diff를 파싱해서 실제 변경된 라인에 달 코멘트들을 생성"""
+    """diff를 파싱해서 실제 변경된 라인에 달 코멘트들을 생성 - AI 기반 간소화"""
     line_comments = []
 
     for file in files[:3]:  # 최대 3개 파일만
         filename = file.get("filename", "")
         patch = file.get("patch", "")
 
-        if not patch or not filename.endswith((".py", ".js", ".ts", ".java", ".go")):
+        # 지원하는 파일 확장자 확장
+        supported_extensions = ('.py', '.java', '.js', '.jsx', '.ts', '.tsx', '.dart', '.go', '.rs', '.cpp', '.c', '.cs', '.php', '.rb', '.swift', '.kt')
+        if not patch or not filename.endswith(supported_extensions):
             continue
+
+        # 언어/프레임워크 감지
+        language = detect_language_from_file(filename)
+        framework = detect_framework_from_patch(patch, language)
 
         # diff 헤더에서 라인 정보 파싱
         lines = patch.split('\n')
         current_line_number = None
+        comment_count = 0  # 파일당 코멘트 수 제한
 
         for i, line in enumerate(lines):
             # @@ -old_start,old_count +new_start,new_count @@ 형태 파싱
@@ -603,76 +648,30 @@ def parse_diff_and_get_line_comments(files, ai_reviews):
                     current_line_number = int(match.group(1))
                 continue
 
-            # 실제 변경된 라인들 분석
-            if line.startswith('+') and not line.startswith('+++'):
-                added_line = line[1:]  # + 제거
+            # 실제 변경된 라인들 분석 (중요한 라인만)
+            if line.startswith('+') and not line.startswith('+++') and comment_count < 5:
+                added_line = line[1:].strip()  # + 제거
 
-                # 중요한 변경사항만 코멘트 달기
-                if any(keyword in added_line for keyword in ['def ', 'class ', 'async ', 'await ', 'import ', 'from ']):
+                # 의미있는 코드 라인만 코멘트 (빈 라인, 주석, 괄호만 있는 라인 제외)
+                if (added_line and
+                    not added_line.startswith(('#', '//', '/*', '*', '{', '}', ')', '(')) and
+                    len(added_line) > 10):
 
-                    # 격려/분석/지적 중 하나를 순환하면서 선택
+                    # 리뷰어 이름을 순환하면서 할당
                     reviewer_names = ["격려", "분석", "지적"]
-                    reviewer_name = reviewer_names[i % 3]
+                    reviewer_name = reviewer_names[comment_count % 3]
 
-                    # 클린코드 기반 실제 변경사항 분석 + 구체적 예시
-                    if 'def ' in added_line and len(added_line.strip()) > 80:
-                        comments_pool = [
-                            f"**{reviewer_name}**: 함수 시그니처가 깔끔함. 예시: 파라미터명이 명확함",
-                            f"**{reviewer_name}**: 파라미터 5개 이상이면 객체로 묶어보세요. 예시: UserData 클래스 활용",
-                            f"**{reviewer_name}**: 함수명이 동사+명사 패턴 좋음. 예시: calculate_score()"
-                        ]
-                    elif 'async def' in added_line:
-                        comments_pool = [
-                            f"**{reviewer_name}**: 비동기 함수명 깔끔함. 예시: async 접두사 불필요",
-                            f"**{reviewer_name}**: 비동기 처리 관심사 분리 잘됨. 예시: 단일 책임 유지",
-                            f"**{reviewer_name}**: 함수 길이 15라인 이하로 유지하세요. 예시: 3개 함수로 분리"
-                        ]
-                    elif 'class ' in added_line:
-                        comments_pool = [
-                            f"**{reviewer_name}**: 클래스명 PascalCase 좋음. 예시: UserManager",
-                            f"**{reviewer_name}**: 단일 책임 원칙 확인 필요. 예시: 역할별 클래스 분리",
-                            f"**{reviewer_name}**: 상속보다 컴포지션 고려. 예시: 인터페이스 활용"
-                        ]
-                    elif 'import ' in added_line:
-                        comments_pool = [
-                            f"**{reviewer_name}**: import 순서 좋음. 예시: 표준→서드파티→로컬",
-                            f"**{reviewer_name}**: 순환 import 위험 체크. 예시: 모듈 의존성 확인",
-                            f"**{reviewer_name}**: 사용하지 않는 import 정리하세요. 예시: unused import 제거"
-                        ]
-                    elif len(added_line.strip()) > 100:
-                        comments_pool = [
-                            f"**{reviewer_name}**: 한 라인이 너무 김. 예시: 80자 이하 권장",
-                            f"**{reviewer_name}**: 체이닝보다 중간 변수 사용. 예시: result = step1().step2()",
-                            f"**{reviewer_name}**: 복잡한 표현식 함수로 추출. 예시: is_valid_user() 함수"
-                        ]
-                    elif any(magic in added_line for magic in ['5', '10', '100', '1000']):
-                        comments_pool = [
-                            f"**{reviewer_name}**: Magic Number 발견. 예시: MAX_RETRY_COUNT = 5",
-                            f"**{reviewer_name}**: 의미있는 상수명으로 추출. 예시: DEFAULT_TIMEOUT = 30",
-                            f"**{reviewer_name}**: 하드코딩된 숫자는 설정으로 분리. 예시: config.json 활용"
-                        ]
-                    elif 'return ' in added_line and len(added_line.split('return')[1].strip()) > 50:
-                        comments_pool = [
-                            f"**{reviewer_name}**: 복잡한 return문. 예시: result 변수 활용",
-                            f"**{reviewer_name}**: Early Return 패턴 적용. 예시: if not valid: return None",
-                            f"**{reviewer_name}**: 조건부 반환은 가드 클로즈 사용. 예시: 예외 케이스 먼저 처리"
-                        ]
-                    else:
-                        comments_pool = [
-                            f"**{reviewer_name}**: 코드 의도가 명확함. 예시: 변수명이 목적 표현",
-                            f"**{reviewer_name}**: 변수명이 의미를 잘 표현. 예시: user_count vs count",
-                            f"**{reviewer_name}**: 적절한 추상화 레벨 유지. 예시: 비즈니스 로직 분리"
-                        ]
-
-                    # 리뷰어별로 다른 스타일의 코멘트 선택
-                    comment = comments_pool[i % 3]
+                    # 간단한 코멘트 생성 (AI 리뷰 내용 활용하거나 기본 메시지)
+                    comment = generate_simple_line_comment(added_line, language, framework, reviewer_name)
 
                     # GitHub API용 코멘트 데이터 생성
                     line_comments.append({
                         "path": filename,
                         "line": current_line_number if current_line_number else 1,
-                        "body": comment
+                        "body": f"**{reviewer_name}**: {comment}"
                     })
+
+                    comment_count += 1
 
                 # 라인 번호 증가
                 if current_line_number:
@@ -683,3 +682,39 @@ def parse_diff_and_get_line_comments(files, ai_reviews):
                     current_line_number += 1
 
     return line_comments
+
+def generate_simple_line_comment(code_line, language, framework, reviewer_type):
+    """간단한 라인 코멘트 생성 - AI에게 맡기는 대신 기본적인 패턴 매칭"""
+
+    # 일반적인 좋은 패턴들
+    good_patterns = {
+        'def ': f"{language} 함수 정의 좋음. 예시: 네이밍 명확",
+        'class ': f"{language} 클래스 구조 적절. 예시: 객체지향 원칙",
+        'async ': f"비동기 처리 패턴 적절. 예시: {framework} 모범사례",
+        'import ': f"의존성 관리 좋음. 예시: 필요한 모듈만",
+        'const ': f"상수 선언 명확. 예시: 불변성 보장",
+        '= ': f"변수 할당 적절. 예시: 의미있는 변수명"
+    }
+
+    # 개선이 필요한 패턴들
+    improvement_patterns = {
+        'long_line': f"라인이 길어요. 예시: {len(code_line)}자 → 80자 이하 권장",
+        'complex': f"복잡도 확인 필요. 예시: 함수 분리 고려",
+        'magic_number': f"Magic Number 발견. 예시: 상수로 추출"
+    }
+
+    # 패턴 매칭
+    for pattern, comment in good_patterns.items():
+        if pattern in code_line.lower():
+            return comment
+
+    # 라인 길이 체크
+    if len(code_line) > 80:
+        return improvement_patterns['long_line']
+
+    # 숫자 리터럴 체크
+    if any(num in code_line for num in ['100', '200', '500', '1000']):
+        return improvement_patterns['magic_number']
+
+    # 기본 코멘트
+    return f"{language} 코드 개선 좋음. 예시: {framework} 패턴 활용"
