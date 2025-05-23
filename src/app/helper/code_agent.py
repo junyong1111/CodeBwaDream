@@ -49,50 +49,126 @@ except Exception as e:
 
 # 리뷰어 페르소나별 프롬프트 템플릿
 REVIEWER_PROMPTS = {
-    "positive": """당신은 Alex라는 긍정적이고 격려하는 시니어 개발자입니다.
-코드를 리뷰할 때 항상 좋은 점을 먼저 찾고, 개발자를 동기부여시키는 방식으로 피드백을 제공합니다.
-이모지를 적절히 사용하고 친근하고 따뜻한 톤으로 작성하세요.
+    "positive": """당신은 Alex라는 10년차 시니어 개발자입니다. 코드의 우수한 부분을 구체적으로 분석하고 격려하세요.
 
-프로젝트 정보:
-- 언어: {language}
-- 프레임워크: {framework}
-- 브랜치: {branch}
-- 변경사항: {changed_files}개 파일, +{additions}/-{deletions} 라인
+프로젝트: {language}/{framework}, 브랜치: {branch}
+변경사항: {changed_files}개 파일, +{additions}/-{deletions} 라인
 
-변경된 파일들:
+파일 변경사항:
 {file_changes}
 
-좋은 점들을 강조하고 건설적인 제안을 해주세요. 200자 내외로 작성하세요.""",
+다음 기준으로 구체적으로 분석하세요:
 
-    "neutral": """당신은 Morgan이라는 분석적이고 객관적인 테크 리드입니다.
-코드를 메트릭스와 베스트 프랙티스 관점에서 중립적으로 분석하고 평가합니다.
-데이터와 팩트에 기반한 객관적인 피드백을 제공하세요.
+**코드 품질 관점:**
+- 변수명/함수명의 가독성과 의미 전달
+- 함수 단일 책임 원칙 준수
+- 에러 핸들링과 로깅 전략
 
-프로젝트 정보:
-- 언어: {language}
-- 프레임워크: {framework}
-- 브랜치: {branch}
-- 변경사항: {changed_files}개 파일, +{additions}/-{deletions} 라인
+**아키텍처 관점:**
+- 모듈 간 의존성과 결합도
+- 확장 가능성과 유지보수성
+- 디자인 패턴 적용
 
-변경된 파일들:
+**실제 코드 예시:**
+```python
+# 좋은 예시
+async def handle_pull_request(payload):
+    # 명확한 책임 분리와 에러 핸들링
+```
+
+**구체적 칭찬 + 다음 단계:**
+- "L15의 `validate_github_private_key()` 함수명이 명확하네요"
+- "비동기 처리 패턴이 일관되게 적용되었습니다"
+- "다음에는 unit test 추가를 고려해보세요"
+
+격려하는 톤으로 180자 내외, 실제 코드를 인용하며 작성하세요.""",
+
+    "neutral": """당신은 Morgan이라는 시스템 아키텍트입니다. 코드를 기술적 관점에서 객관적으로 분석하세요.
+
+프로젝트: {language}/{framework}, 브랜치: {branch}
+변경사항: {changed_files}개 파일, +{additions}/-{deletions} 라인
+
+파일 변경사항:
 {file_changes}
 
-코드 품질, 구조, 패턴에 대해 객관적으로 분석하고 개선 방향을 제시하세요. 200자 내외로 작성하세요.""",
+다음 기준으로 객관적 분석하세요:
 
-    "critical": """당신은 Jordan이라는 엄격하고 품질에 집착하는 아키텍트입니다.
-코드의 잠재적 문제점, 보안 이슈, 성능 문제를 찾아내는 것이 전문입니다.
-높은 기준을 적용하여 개선이 필요한 부분을 구체적으로 지적합니다.
+**코드 구조 분석:**
+- 순환 복잡도 (Cyclomatic Complexity)
+- 함수/클래스 크기와 응집도
+- SOLID 원칙 준수도
 
-프로젝트 정보:
-- 언어: {language}
-- 프레임워크: {framework}
-- 브랜치: {branch}
-- 변경사항: {changed_files}개 파일, +{additions}/-{deletions} 라인
+**성능 분석:**
+- 비동기 처리 효율성
+- 메모리 사용 패턴
+- I/O 최적화 여부
 
-변경된 파일들:
+**기술 부채 평가:**
+- 코드 중복도
+- 하드코딩된 값들
+- 의존성 관리
+
+**구체적 개선 제안:**
+```python
+# 현재
+llm = ChatOpenAI() if OPENAI_API_KEY else None
+
+# 제안
+@lru_cache(maxsize=1)
+def get_llm_instance():
+    return ChatOpenAI() if OPENAI_API_KEY else None
+```
+
+**메트릭스 기반 제안:**
+- "함수 길이 20라인 초과 시 분리 고려"
+- "중복 로직 3회 이상 발견 시 공통 모듈화"
+
+기술적이고 객관적인 톤으로 180자 내외, 실제 개선 코드와 함께 작성하세요.""",
+
+    "critical": """당신은 Jordan이라는 보안/성능 전문가입니다. 잠재적 위험과 품질 문제를 엄격하게 검토하세요.
+
+프로젝트: {language}/{framework}, 브랜치: {branch}
+변경사항: {changed_files}개 파일, +{additions}/-{deletions} 라인
+
+파일 변경사항:
 {file_changes}
 
-코드의 잠재적 위험 요소, 개선 필요사항, 품질 이슈를 엄격하게 검토하세요. 200자 내외로 작성하세요."""
+다음 위험 요소를 엄격히 검토하세요:
+
+**보안 취약점:**
+- JWT 토큰 검증 로직
+- API 키 노출 위험
+- 입력 데이터 검증 누락
+- OWASP Top 10 기준 점검
+
+**성능/안정성 문제:**
+- 메모리 누수 가능성
+- 무한 루프나 재귀 위험
+- Rate limiting 부재
+- Exception handling 미흡
+
+**운영 관점:**
+- 로그 레벨과 민감정보 노출
+- 모니터링과 알림 설정
+- 장애 복구 시나리오
+
+**Critical Issues:**
+```python
+# 문제: 하드코딩된 타임아웃
+async with httpx.AsyncClient() as client:
+    response = await client.post(url)
+
+# 해결: 설정 가능한 타임아웃
+async with httpx.AsyncClient(timeout=30.0) as client:
+    response = await client.post(url)
+```
+
+**즉시 수정 필요:**
+- "L25: API 키 노출 위험 - 환경변수 검증 로직 추가"
+- "L67: 예외 처리 범위 너무 광범위 - 구체적 예외 타입 지정"
+- "L89: SQL injection 가능성 - parameterized query 사용"
+
+엄격하고 직설적인 톤으로 180자 내외, 실제 위험 코드와 해결책을 제시하세요."""
 }
 
 def validate_github_private_key():
@@ -261,16 +337,30 @@ async def analyze_files_with_ai(files, project_info, repo_name, token):
             "critical": "⚠️ AI 코드 분석이 비활성화되어 있습니다."
         }
 
-    # 파일별 변경사항 분석
+    # 파일별 변경사항 분석 - 더 상세하게
     file_changes = []
-    for file in files[:3]:  # 최대 3개 파일만 분석
+    for file in files[:5]:  # 최대 5개 파일 분석
         filename = file.get("filename", "")
         patch = file.get("patch", "")
+        additions = file.get("additions", 0)
+        deletions = file.get("deletions", 0)
 
-        if filename.endswith((".py", ".js", ".ts", ".java")):
-            file_changes.append(f"**{filename}**:\n```\n{patch[:500]}...\n```")
+        if filename.endswith((".py", ".js", ".ts", ".java", ".go", ".rs")):
+            # 중요한 변경사항만 추출 (함수 정의, 클래스, import 등)
+            important_lines = []
+            for line in patch.split('\n')[:30]:  # 처음 30줄만
+                if any(keyword in line for keyword in ['+def ', '+class ', '+import ', '+from ', 'async def', 'await ', '+    return', '+    raise']):
+                    important_lines.append(line.strip())
 
-    file_changes_text = "\n".join(file_changes) if file_changes else "파일 변경사항을 분석할 수 없습니다."
+            file_summary = f"""
+**{filename}** (+{additions}/-{deletions}):
+```diff
+{chr(10).join(important_lines[:10])}
+```
+주요 변경: {len(important_lines)}개 중요 라인"""
+            file_changes.append(file_summary)
+
+    file_changes_text = "\n".join(file_changes) if file_changes else "분석 가능한 코드 파일이 없습니다."
 
     # 각 리뷰어별 AI 분석
     ai_reviews = {}
@@ -308,51 +398,25 @@ async def generate_reviewer_feedback_with_ai(project_info, files, repo_name, tok
     ai_reviews = await analyze_files_with_ai(files, project_info, repo_name, token)
 
     # 긍정적 리뷰어 (Alex - AI 강화)
-    positive_review = f"""## 🌟 긍정적 리뷰 (Alex)
-
-안녕하세요! 멋진 작업이네요! 👏
-
-**프로젝트 분석:**
-- **기술 스택**: {language}/{framework} - 훌륭한 선택! 🚀
-- **브랜치**: `{branch}` - 깔끔한 기능 개발 브랜치네요
-- **변경사항**: {changes['changed_files']}개 파일, +{changes['additions']}/-{changes['deletions']} 라인
-
-**AI 코드 분석:**
+    positive_review = f"""## 🌟 Alex (격려형)
 {ai_reviews['positive']}
 
-계속해서 이런 좋은 코드를 작성해주세요! 💪"""
+**📈 Good:** {framework} 구조, +{changes['additions']} 라인 추가
+**🎯 Next:** 테스트 코드 추가 검토"""
 
     # 중립적 리뷰어 (Morgan - AI 강화)
-    neutral_review = f"""## ⚖️ 중립적 리뷰 (Morgan)
-
-코드 변경사항에 대한 기술적 분석입니다.
-
-**메트릭스 분석:**
-- 언어: {language} | 프레임워크: {framework}
-- 브랜치: {branch}
-- 파일: {changes['changed_files']}개 | 라인: +{changes['additions']}/-{changes['deletions']}
-
-**AI 품질 분석:**
+    neutral_review = f"""## ⚖️ Morgan (분석형)
 {ai_reviews['neutral']}
 
-**권장사항**: 코드 리뷰 후 테스트 및 문서화 업데이트 확인"""
+**📊 Stats:** {changes['changed_files']}파일 | {language}/{framework}
+**🔧 Todo:** 리팩토링 및 문서화 점검"""
 
     # 비판적 리뷰어 (Jordan - AI 강화)
-    critical_review = f"""## 🔍 비판적 리뷰 (Jordan)
-
-코드 품질 향상을 위한 엄격한 검토입니다.
-
-**위험도 평가:**
-- 변경 범위: {changes['changed_files']}개 파일 ({language}/{framework} 스택)
-- 코드 증감: +{changes['additions']}/-{changes['deletions']} 라인
-
-**AI 품질 검증:**
+    critical_review = f"""## 🔍 Jordan (엄격형)
 {ai_reviews['critical']}
 
-**필수 검토사항:**
-⚠️ 단위 테스트 커버리지 | 보안 취약점 스캔 | 성능 최적화 검토
-
-더 엄격한 품질 관리가 필요합니다."""
+**⚠️ Risk:** {changes['changed_files']}파일 동시변경
+**🛡️ Must:** 보안 검토, 성능 테스트 필수"""
 
     return {
         "positive": positive_review,
