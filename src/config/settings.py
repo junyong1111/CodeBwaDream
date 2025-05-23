@@ -28,31 +28,45 @@ def get_github_private_key():
     # 줄바꿈 문자 정규화 - 더 강력한 처리
     private_key = private_key_env.replace('\\n', '\n').replace('\\r', '').strip()
 
-    # PEM 형식 검증 및 정규화
-    if "-----BEGIN RSA PRIVATE KEY-----" in private_key:
-        # RSA 형식은 그대로 유지
-        return private_key
-    elif "-----BEGIN PRIVATE KEY-----" in private_key:
-        # PKCS#8 형식은 그대로 유지
-        return private_key
-    elif "-----BEGIN OPENSSH PRIVATE KEY-----" in private_key:
-        # OpenSSH 형식은 지원하지 않음
-        return None
-    else:
-        # 헤더/푸터 없는 경우 키 내용만 추출하여 재구성
+    # PEM 형식 재구성 - 안전한 방법
+    if "-----BEGIN" in private_key and "-----END" in private_key:
         lines = private_key.split('\n')
-        key_lines = [line.strip() for line in lines if line.strip() and not line.startswith('-----')]
+        cleaned_lines = []
 
-        if key_lines:
-            key_content = ''.join(key_lines)
-            # Base64 검증
-            try:
-                base64.b64decode(key_content + '==')  # 패딩 추가하여 검증
-                return f"-----BEGIN PRIVATE KEY-----\n{key_content}\n-----END PRIVATE KEY-----"
-            except Exception:
-                return None
+        for line in lines:
+            line = line.strip()
+            if line:  # 빈 줄 제거
+                cleaned_lines.append(line)
 
-        return None
+        # PEM 블록 재구성
+        if cleaned_lines:
+            # 헤더 찾기
+            header_idx = -1
+            footer_idx = -1
+
+            for i, line in enumerate(cleaned_lines):
+                if line.startswith("-----BEGIN"):
+                    header_idx = i
+                elif line.startswith("-----END"):
+                    footer_idx = i
+                    break
+
+            if header_idx >= 0 and footer_idx > header_idx:
+                header = cleaned_lines[header_idx]
+                footer = cleaned_lines[footer_idx]
+                key_content = cleaned_lines[header_idx + 1:footer_idx]
+
+                # 키 내용을 64자씩 줄바꿈
+                all_key_content = ''.join(key_content)
+                formatted_content = []
+                for i in range(0, len(all_key_content), 64):
+                    formatted_content.append(all_key_content[i:i+64])
+
+                # PEM 형식으로 재구성
+                result = header + '\n' + '\n'.join(formatted_content) + '\n' + footer
+                return result
+
+    return None
 
 GITHUB_APP_PRIVATE_KEY = get_github_private_key()
 GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
