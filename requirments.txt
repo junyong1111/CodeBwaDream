@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+httpx
+PyJWT
+cryptography
+langchain
+langchain-openai
+langchain-community
+python-dotenv

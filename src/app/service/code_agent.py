@@ -35,9 +35,24 @@ async def get_code_review_agent_service(request: Request):
 
         # 풀 리퀘스트 이벤트 처리
         _LOGGER.info("풀 리퀘스트 이벤트 처리 시작")
-        if event_type == "pull_request" and payload.get("action") in ["opened", "synchronize"]:
-            await agent_helper.handle_pull_request(payload)
-        return {"status": "받음", "event_type": event_type}
+        action = payload.get("action")
+
+        # 코드 리뷰가 필요한 액션들
+        code_review_actions = ["opened", "synchronize", "reopened"]
+        # 알림만 보내는 액션들
+        notification_actions = ["assigned", "review_requested", "ready_for_review"]
+
+        if event_type == "pull_request":
+            if action in code_review_actions:
+                _LOGGER.info(f"코드 리뷰 실행: {action} 액션")
+                await agent_helper.handle_pull_request(payload)
+            elif action in notification_actions:
+                _LOGGER.info(f"알림 처리: {action} 액션")
+                await agent_helper.handle_pr_notification(payload)
+            else:
+                _LOGGER.info(f"처리하지 않는 액션: {action}")
+
+        return {"status": "받음", "event_type": event_type, "action": action}
 
     except Exception as e:
         _LOGGER.error(f"웹훅 처리 중 오류 발생: {str(e)}", exc_info=True)
