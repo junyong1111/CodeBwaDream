@@ -47,51 +47,54 @@ except Exception as e:
     _LOGGER.warning(f"OpenAI 초기화 실패: {str(e)}")
     llm = None
 
-# 클린코드 기반 리뷰어 프롬프트 - AI가 언어별로 동적 분석
-def get_dynamic_reviewer_prompts(language, framework):
-    """AI가 언어/프레임워크별 동적 분석하도록 프롬프트 생성"""
+# AI 기반 동적 분석 프롬프트
+def get_dynamic_reviewer_prompts():
+    """AI가 언어/프레임워크를 감지하고 동적 분석하도록 프롬프트 생성"""
 
     return {
-        "positive": f"""당신은 "격려" 리뷰어입니다.
+        "positive": """당신은 "격려" 리뷰어입니다.
 
-**언어/프레임워크**: {language}/{framework}
-**요구사항**: {{requirements}}
+**요구사항**: {requirements}
+
 **실제 변경된 코드**:
-{{diff_analysis}}
+{diff_analysis}
 
-위 {language}/{framework} 코드 변경사항을 분석해서 **잘한 부분을 구체적으로 칭찬**하세요.
-- {language}의 모범사례와 {framework}의 패턴 활용도 평가
-- 실제 코드 라인을 인용하여 구체적 예시 포함
-- 30자 내외로 간결하게 작성
-- "예시: 함수명이 명확함 → getUserInfo()" 형태로 구체적 예시 필수
+위 코드를 분석해서:
+1. 먼저 파일 확장자와 코드 내용으로 언어/프레임워크를 정확히 감지하세요
+2. 해당 언어/프레임워크에 특화된 모범사례 관점에서 **잘한 부분을 구체적으로 칭찬**하세요
+3. 실제 변경된 코드 라인을 인용하여 구체적 예시 포함
+4. 30자 내외로 간결하게 작성
+5. "예시: async def handle_request() → 비동기 처리 명확" 형태로 실제 코드 예시 필수
 """,
 
-        "neutral": f"""당신은 "분석" 리뷰어입니다.
+        "neutral": """당신은 "분석" 리뷰어입니다.
 
-**언어/프레임워크**: {language}/{framework}
-**요구사항**: {{requirements}}
+**요구사항**: {requirements}
+
 **실제 변경된 코드**:
-{{diff_analysis}}
+{diff_analysis}
 
-위 {language}/{framework} 코드 변경사항의 **트레이드오프를 객관적 분석**하세요.
-- {language} 언어 특성과 {framework} 설계 원칙 관점에서 평가
-- 성능 vs 가독성, 복잡도 vs 유지보수성 등 균형점 분석
-- 30자 내외로 간결하게 작성
-- "예시: 함수 분리로 가독성↑ 성능↓" 형태로 구체적 예시 필수
+위 코드를 분석해서:
+1. 먼저 파일 확장자와 코드 내용으로 언어/프레임워크를 정확히 감지하세요
+2. 해당 언어/프레임워크 특성 관점에서 **트레이드오프를 객관적 분석**하세요
+3. 성능 vs 가독성, 복잡도 vs 유지보수성 등 균형점 분석
+4. 30자 내외로 간결하게 작성
+5. "예시: 함수 분리로 가독성↑ 성능↓" 형태로 구체적 예시 필수
 """,
 
-        "critical": f"""당신은 "지적" 리뷰어입니다.
+        "critical": """당신은 "지적" 리뷰어입니다.
 
-**언어/프레임워크**: {language}/{framework}
-**요구사항**: {{requirements}}
+**요구사항**: {requirements}
+
 **실제 변경된 코드**:
-{{diff_analysis}}
+{diff_analysis}
 
-위 {language}/{framework} 코드에서 **개선이 필요한 부분을 엄격히 지적**하세요.
-- {language} 모범사례 위반과 {framework} 안티패턴 감지
-- 실제 코드를 인용하여 구체적 개선 방안 제시
-- 30자 내외로 간결하게 작성
-- "예시: 50라인 함수 → 3개로 분리 필요" 형태로 구체적 예시 필수
+위 코드를 분석해서:
+1. 먼저 파일 확장자와 코드 내용으로 언어/프레임워크를 정확히 감지하세요
+2. 해당 언어/프레임워크 모범사례 위반과 안티패턴을 **엄격히 지적**하세요
+3. 실제 변경된 코드를 인용하여 구체적 개선 방안 제시
+4. 30자 내외로 간결하게 작성
+5. "예시: 50라인 함수 → 3개로 분리 필요" 형태로 구체적 예시 필수
 """
     }
 
@@ -187,33 +190,13 @@ async def get_pr_files(repo_name, pr_number, token):
         response.raise_for_status()
         return response.json()
 
-# 언어/프레임워크 감지 및 분석
+# 언어/프레임워크 감지 및 분석 - AI 위임
 def analyze_project_info(payload):
-    """프로젝트 정보를 분석하여 언어, 프레임워크, 변경사항을 파악"""
+    """프로젝트 기본 정보만 추출 - 언어/프레임워크는 AI가 감지"""
     repo = payload.get("repository", {})
     pr = payload.get("pull_request", {})
 
-    # 기본 정보 추출
-    language = repo.get("language", "Unknown")
-    description = repo.get("description", "")
-    branch_name = pr.get("head", {}).get("ref", "")
-
-    # 프레임워크 감지
-    framework = "Unknown"
-    if "fastapi" in description.lower():
-        framework = "FastAPI"
-    elif "django" in description.lower():
-        framework = "Django"
-    elif "flask" in description.lower():
-        framework = "Flask"
-    elif "react" in description.lower():
-        framework = "React"
-    elif "vue" in description.lower():
-        framework = "Vue.js"
-    elif "angular" in description.lower():
-        framework = "Angular"
-
-    # 변경사항 분석
+    # 변경사항 통계만 추출 (AI가 나머지 분석)
     changes = {
         "commits": pr.get("commits", 0),
         "additions": pr.get("additions", 0),
@@ -222,11 +205,11 @@ def analyze_project_info(payload):
     }
 
     return {
-        "language": language,
-        "framework": framework,
-        "branch": branch_name,
+        "language": "AI가 감지",  # AI가 동적으로 감지
+        "framework": "AI가 감지",  # AI가 동적으로 감지
+        "branch": pr.get("head", {}).get("ref", ""),
         "changes": changes,
-        "description": description
+        "description": repo.get("description", "")
     }
 
 async def get_file_content(repo_name, file_path, token, sha=None):
@@ -252,8 +235,8 @@ async def get_file_content(repo_name, file_path, token, sha=None):
         _LOGGER.error(f"파일 내용 가져오기 실패 {file_path}: {str(e)}")
         return None
 
-def analyze_diff_content(files, language, framework):
-    """실제 diff 내용을 간단하게 정리 - AI가 분석하도록"""
+def analyze_diff_content(files):
+    """실제 diff 내용을 AI가 분석하도록 간단 정리"""
     diff_analysis = []
 
     for file in files[:3]:  # 최대 3개 파일
@@ -265,22 +248,28 @@ def analyze_diff_content(files, language, framework):
         if not patch:
             continue
 
-        # 실제 언어와 프레임워크 감지
-        actual_language = detect_language_from_file(filename)
-        actual_framework = detect_framework_from_patch(patch, actual_language)
-
-        # diff의 핵심 변경사항만 추출 (+ 라인들)
+        # diff의 핵심 변경사항만 추출
         added_lines = []
+        removed_lines = []
+
         for line in patch.split('\n'):
             if line.startswith('+') and not line.startswith('+++'):
                 code_line = line[1:].strip()
                 if code_line and not code_line.startswith('#') and not code_line.startswith('//'):
                     added_lines.append(code_line)
+            elif line.startswith('-') and not line.startswith('---'):
+                code_line = line[1:].strip()
+                if code_line and not code_line.startswith('#') and not code_line.startswith('//'):
+                    removed_lines.append(code_line)
 
-        # 파일별 요약
-        file_summary = f"""**{filename}** ({actual_language}/{actual_framework}) (+{additions}/-{deletions}):
-주요 변경사항:
-{chr(10).join(added_lines[:5])}"""  # 최대 5개 라인만
+        # 파일별 요약 (AI가 모든 것을 감지하도록)
+        file_summary = f"""**{filename}** (+{additions}/-{deletions}):
+
+추가된 코드:
+{chr(10).join(added_lines[:8])}
+
+제거된 코드:
+{chr(10).join(removed_lines[:3])}"""
 
         diff_analysis.append(file_summary)
 
@@ -359,24 +348,18 @@ async def analyze_files_with_ai(files, project_info, repo_name, token, requireme
             "critical": "⚠️ AI 코드 분석이 비활성화되어 있습니다."
         }
 
-    # 🎯 실제 diff 내용 상세 분석 (언어/프레임워크 특화)
-    diff_analysis = analyze_diff_content(files, project_info["language"], project_info["framework"])
+    # 🎯 실제 diff 내용 분석 (AI가 모든 것을 동적으로)
+    diff_analysis = analyze_diff_content(files)
     _LOGGER.info(f"실제 diff 분석 완료: {len(diff_analysis)} 문자")
 
-    # 각 리뷰어별 AI 분석
+    # 각 리뷰어별 AI 분석 (AI가 모든 언어/프레임워크 감지 담당)
     ai_reviews = {}
 
-    for reviewer_type, prompt_template in get_dynamic_reviewer_prompts(project_info["language"], project_info["framework"]).items():
+    for reviewer_type, prompt_template in get_dynamic_reviewer_prompts().items():
         try:
             prompt = prompt_template.format(
                 requirements=requirements,
-                diff_analysis=diff_analysis,  # 🔥 실제 변경사항 분석 결과 전달
-                language=project_info["language"],
-                framework=project_info["framework"],
-                branch=project_info["branch"],
-                changed_files=project_info["changes"]["changed_files"],
-                additions=project_info["changes"]["additions"],
-                deletions=project_info["changes"]["deletions"]
+                diff_analysis=diff_analysis
             )
 
             response = await llm.ainvoke([SystemMessage(content=prompt)])
@@ -390,19 +373,19 @@ async def analyze_files_with_ai(files, project_info, repo_name, token, requireme
 
 # 3명의 리뷰어 페르소나 정의 (AI 강화 버전)
 async def generate_reviewer_feedback_with_ai(project_info, files, repo_name, token, requirements):
-    """AI를 활용한 3명의 리뷰어 피드백 생성 - 간결 버전"""
-    # AI 분석 실행 (요구사항 포함)
+    """AI를 활용한 3명의 리뷰어 피드백 생성 - AI 완전 위임 버전"""
+    # AI 분석 실행 (모든 분석을 AI가 담당)
     ai_reviews = await analyze_files_with_ai(files, project_info, repo_name, token, requirements)
 
-    # 격려 (긍정형) - 클린코드 전문가
+    # 격려 (긍정형) - AI가 모든 것을 감지 후 분석
     positive_review = f"""## ✅ 격려
 {ai_reviews['positive']}"""
 
-    # 분석 (중립형) - 리팩토링 전문가
+    # 분석 (중립형) - AI가 모든 것을 감지 후 분석
     neutral_review = f"""## ⚖️ 분석
 {ai_reviews['neutral']}"""
 
-    # 지적 (비판형) - 코드 품질 감시자
+    # 지적 (비판형) - AI가 모든 것을 감지 후 분석
     critical_review = f"""## 🚨 지적
 {ai_reviews['critical']}"""
 
@@ -412,62 +395,24 @@ async def generate_reviewer_feedback_with_ai(project_info, files, repo_name, tok
         "critical": critical_review
     }
 
-def extract_requirements_from_pr(payload):
-    """PR 제목, 본문에서 요구사항 추출"""
-    pr = payload.get("pull_request", {})
-
-    title = pr.get("title", "")
-    body = pr.get("body", "") or ""
-
-    # 요구사항 관련 키워드들
-    requirement_keywords = [
-        "요구사항", "requirement", "구현", "implement", "추가", "add",
-        "수정", "fix", "개선", "improve", "변경", "change", "기능", "feature",
-        "버그", "bug", "이슈", "issue", "문제", "problem", "리팩토링", "refactor"
-    ]
-
-    # 요구사항 추출
-    requirements = []
-
-    # 제목에서 추출 (항상 포함)
-    if title.strip():
-        requirements.append(f"제목: {title}")
-
-    # 본문에서 요구사항 추출
-    if body:
-        for line in body.split('\n')[:5]:  # 처음 5줄만
-            line = line.strip()
-            if line and any(keyword in line.lower() for keyword in requirement_keywords):
-                requirements.append(f"설명: {line[:80]}")
-                break
-
-    # 기본값 처리 - 빈 경우 자동 생성
-    if not requirements or not any(req.strip() for req in requirements):
-        requirements = [f"기본작업: 코드 개선 및 수정"]
-
-    result = " | ".join(requirements[:2])  # 최대 2개만
-
-    # 빈 문자열 방지
-    return result if result.strip() else "기본작업: 코드 품질 개선"
-
-# 클린코드 기반 코드 리뷰 작성 (신규)
+# AI 기반 코드 리뷰 작성 (신규)
 async def create_code_review_with_requirements(repo_name, pr_number, files, token, project_info, requirements):
-    """클린코드 기반 코드 리뷰 작성"""
+    """AI 완전 위임 기반 코드 리뷰 작성"""
     url = f"https://api.github.com/repos/{repo_name}/pulls/{pr_number}/reviews"
     headers = {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3+json"
     }
 
-    # 🎯 클린코드 기반 3명의 리뷰어 피드백 생성
+    # 🎯 AI 완전 위임 기반 3명의 리뷰어 피드백 생성
     feedback = await generate_reviewer_feedback_with_ai(project_info, files, repo_name, token, requirements)
 
-    # 📍 클린코드 기반 인라인 코멘트 생성
-    line_comments = parse_diff_and_get_line_comments(files, feedback)
-    _LOGGER.info(f"생성된 클린코드 인라인 코멘트: {len(line_comments)}개")
+    # 📍 AI 기반 인라인 코멘트 생성
+    line_comments = await generate_ai_line_comments(files, requirements)
+    _LOGGER.info(f"생성된 AI 인라인 코멘트: {len(line_comments)}개")
 
-    # 전체 리뷰 본문 (간결 버전)
-    review_body = f"""# 🧹 클린코드 리뷰
+    # 전체 리뷰 본문 (AI 기반)
+    review_body = f"""# 🤖 AI 코드 리뷰
 
 **요구사항:** {requirements}
 
@@ -487,7 +432,7 @@ async def create_code_review_with_requirements(repo_name, pr_number, files, toke
 
 ---
 
-💡 각 변경된 라인에 격려/분석/지적의 클린코드 피드백이 달렸습니다."""
+💡 각 변경된 라인에 AI가 언어/프레임워크를 감지하여 특화된 피드백을 제공했습니다."""
 
     # GitHub API 리뷰 데이터
     review_data = {
@@ -500,10 +445,10 @@ async def create_code_review_with_requirements(repo_name, pr_number, files, toke
         async with httpx.AsyncClient() as client:
             response = await client.post(url, headers=headers, json=review_data)
             response.raise_for_status()
-            _LOGGER.info(f"PR #{pr_number}에 클린코드 리뷰 작성 완료")
+            _LOGGER.info(f"PR #{pr_number}에 AI 기반 코드 리뷰 작성 완료")
             return True
     except Exception as e:
-        _LOGGER.error(f"클린코드 리뷰 작성 실패: {str(e)}")
+        _LOGGER.error(f"AI 코드 리뷰 작성 실패: {str(e)}")
         return False
 
 def verify_webhook_signature(payload_body, signature_header, secret):
@@ -516,18 +461,33 @@ def verify_webhook_signature(payload_body, signature_header, secret):
     expected_signature = "sha256=" + hash_object.hexdigest()
     return hmac.compare_digest(expected_signature, signature_header)
 
+def extract_requirements_from_pr(payload):
+    """PR 제목, 본문에서 요구사항 추출 - AI 처리를 위한 간단 버전"""
+    pr = payload.get("pull_request", {})
+
+    title = pr.get("title", "")
+    body = pr.get("body", "") or ""
+
+    # 간단하게 제목과 본문 조합
+    if title.strip():
+        if body.strip():
+            return f"제목: {title} | 설명: {body[:100]}"
+        else:
+            return f"제목: {title}"
+    else:
+        return "기본작업: 코드 품질 개선"
 
 async def handle_pull_request(payload):
     try:
         _LOGGER.info("풀 리퀘스트 이벤트 처리 시작")
 
-        # 🎯 PR 요구사항 추출 (필수!)
+        # 🎯 PR 요구사항 추출 (간소화)
         requirements = extract_requirements_from_pr(payload)
         _LOGGER.info(f"추출된 요구사항: {requirements}")
 
-        # 프로젝트 정보 분석
+        # 프로젝트 정보 분석 (기본 정보만, AI가 나머지 분석)
         project_info = analyze_project_info(payload)
-        _LOGGER.info(f"프로젝트 분석 완료: {project_info['language']}/{project_info['framework']}")
+        _LOGGER.info(f"프로젝트 분석 완료: 변경파일 {project_info['changes']['changed_files']}개")
 
         # PR 기본 정보 가져오기
         pr = payload.get("pull_request", {})
@@ -547,15 +507,15 @@ async def handle_pull_request(payload):
         files = await get_pr_files(repo_name, pr_number, token)
         _LOGGER.info(f"변경된 파일 {len(files)}개 분석 완료")
 
-        # 🔄 클린코드 기반 코드 리뷰 작성 (신규!)
+        # 🔄 AI 완전 위임 기반 코드 리뷰 작성!
         success = await create_code_review_with_requirements(
             repo_name, pr_number, files, token, project_info, requirements
         )
 
         if success:
-            _LOGGER.info("Robert/Martin/Kent 클린코드 리뷰 작성 성공")
+            _LOGGER.info("AI 기반 동적 코드 리뷰 작성 성공")
         else:
-            _LOGGER.error("리뷰 작성 실패")
+            _LOGGER.error("AI 리뷰 작성 실패")
 
     except Exception as e:
         _LOGGER.error(f"PR 처리 오류: {str(e)}", exc_info=True)
@@ -617,30 +577,26 @@ async def post_simple_comment(repo_name, pr_number, token, message):
         _LOGGER.error(f"알림 코멘트 작성 실패: {str(e)}")
         return False
 
-def parse_diff_and_get_line_comments(files, ai_reviews):
-    """diff를 파싱해서 실제 변경된 라인에 달 코멘트들을 생성 - AI 기반 간소화"""
+async def generate_ai_line_comments(files, requirements):
+    """AI가 실제 변경된 라인별로 정확한 코멘트 생성"""
+    if not llm:
+        return []
+
     line_comments = []
 
-    for file in files[:3]:  # 최대 3개 파일만
+    for file in files[:2]:  # 최대 2개 파일만
         filename = file.get("filename", "")
         patch = file.get("patch", "")
 
-        # 지원하는 파일 확장자 확장
-        supported_extensions = ('.py', '.java', '.js', '.jsx', '.ts', '.tsx', '.dart', '.go', '.rs', '.cpp', '.c', '.cs', '.php', '.rb', '.swift', '.kt')
-        if not patch or not filename.endswith(supported_extensions):
+        if not patch:
             continue
 
-        # 언어/프레임워크 감지
-        language = detect_language_from_file(filename)
-        framework = detect_framework_from_patch(patch, language)
-
-        # diff 헤더에서 라인 정보 파싱
+        # 의미있는 변경 라인들 추출
+        significant_changes = []
         lines = patch.split('\n')
         current_line_number = None
-        comment_count = 0  # 파일당 코멘트 수 제한
 
-        for i, line in enumerate(lines):
-            # @@ -old_start,old_count +new_start,new_count @@ 형태 파싱
+        for line in lines:
             if line.startswith('@@'):
                 import re
                 match = re.search(r'\+(\d+)', line)
@@ -648,73 +604,70 @@ def parse_diff_and_get_line_comments(files, ai_reviews):
                     current_line_number = int(match.group(1))
                 continue
 
-            # 실제 변경된 라인들 분석 (중요한 라인만)
-            if line.startswith('+') and not line.startswith('+++') and comment_count < 5:
-                added_line = line[1:].strip()  # + 제거
-
-                # 의미있는 코드 라인만 코멘트 (빈 라인, 주석, 괄호만 있는 라인 제외)
+            if line.startswith('+') and not line.startswith('+++'):
+                added_line = line[1:].strip()
                 if (added_line and
                     not added_line.startswith(('#', '//', '/*', '*', '{', '}', ')', '(')) and
-                    len(added_line) > 10):
+                    len(added_line) > 15):  # 의미있는 라인만
 
-                    # 리뷰어 이름을 순환하면서 할당
-                    reviewer_names = ["격려", "분석", "지적"]
-                    reviewer_name = reviewer_names[comment_count % 3]
-
-                    # 간단한 코멘트 생성 (AI 리뷰 내용 활용하거나 기본 메시지)
-                    comment = generate_simple_line_comment(added_line, language, framework, reviewer_name)
-
-                    # GitHub API용 코멘트 데이터 생성
-                    line_comments.append({
-                        "path": filename,
-                        "line": current_line_number if current_line_number else 1,
-                        "body": f"**{reviewer_name}**: {comment}"
+                    significant_changes.append({
+                        'line_number': current_line_number,
+                        'code': added_line,
+                        'context': line
                     })
 
-                    comment_count += 1
-
-                # 라인 번호 증가
+                if current_line_number:
+                    current_line_number += 1
+            elif line.startswith(' '):
                 if current_line_number:
                     current_line_number += 1
 
-            elif line.startswith(' '):  # 컨텍스트 라인
-                if current_line_number:
-                    current_line_number += 1
+        # AI에게 각 변경 라인별 코멘트 요청
+        if significant_changes:
+            try:
+                ai_prompt = f"""파일: {filename}
+요구사항: {requirements}
+
+다음 변경된 코드 라인들을 분석해서 각각에 대해 정확한 코멘트를 생성하세요:
+
+{chr(10).join([f"라인 {change['line_number']}: {change['code']}" for change in significant_changes[:5]])}
+
+각 라인별로 다음 형태로 응답하세요:
+라인 X: [격려/분석/지적] 구체적인 코멘트 (30자 내외) 예시: 실제코드예시
+
+반드시:
+1. 파일 확장자와 코드로 언어/프레임워크 감지
+2. 해당 기술 스택에 특화된 리뷰
+3. 실제 변경된 코드를 정확히 분석
+4. 구체적 예시 포함"""
+
+                response = await llm.ainvoke([SystemMessage(content=ai_prompt)])
+                ai_comments = response.content
+
+                # AI 응답 파싱해서 GitHub 코멘트 형태로 변환
+                for change in significant_changes[:5]:
+                    line_num = change['line_number']
+
+                    # AI 응답에서 해당 라인 코멘트 찾기
+                    for line in ai_comments.split('\n'):
+                        if f"라인 {line_num}:" in line:
+                            comment_text = line.replace(f"라인 {line_num}:", "").strip()
+                            if comment_text:
+                                line_comments.append({
+                                    "path": filename,
+                                    "line": line_num,
+                                    "body": comment_text
+                                })
+                            break
+
+            except Exception as e:
+                _LOGGER.error(f"AI 라인 코멘트 생성 실패: {str(e)}")
+                # 실패시 기본 코멘트
+                for change in significant_changes[:3]:
+                    line_comments.append({
+                        "path": filename,
+                        "line": change['line_number'],
+                        "body": f"**분석**: 코드 변경 감지. 예시: {change['code'][:30]}..."
+                    })
 
     return line_comments
-
-def generate_simple_line_comment(code_line, language, framework, reviewer_type):
-    """간단한 라인 코멘트 생성 - AI에게 맡기는 대신 기본적인 패턴 매칭"""
-
-    # 일반적인 좋은 패턴들
-    good_patterns = {
-        'def ': f"{language} 함수 정의 좋음. 예시: 네이밍 명확",
-        'class ': f"{language} 클래스 구조 적절. 예시: 객체지향 원칙",
-        'async ': f"비동기 처리 패턴 적절. 예시: {framework} 모범사례",
-        'import ': f"의존성 관리 좋음. 예시: 필요한 모듈만",
-        'const ': f"상수 선언 명확. 예시: 불변성 보장",
-        '= ': f"변수 할당 적절. 예시: 의미있는 변수명"
-    }
-
-    # 개선이 필요한 패턴들
-    improvement_patterns = {
-        'long_line': f"라인이 길어요. 예시: {len(code_line)}자 → 80자 이하 권장",
-        'complex': f"복잡도 확인 필요. 예시: 함수 분리 고려",
-        'magic_number': f"Magic Number 발견. 예시: 상수로 추출"
-    }
-
-    # 패턴 매칭
-    for pattern, comment in good_patterns.items():
-        if pattern in code_line.lower():
-            return comment
-
-    # 라인 길이 체크
-    if len(code_line) > 80:
-        return improvement_patterns['long_line']
-
-    # 숫자 리터럴 체크
-    if any(num in code_line for num in ['100', '200', '500', '1000']):
-        return improvement_patterns['magic_number']
-
-    # 기본 코멘트
-    return f"{language} 코드 개선 좋음. 예시: {framework} 패턴 활용"
