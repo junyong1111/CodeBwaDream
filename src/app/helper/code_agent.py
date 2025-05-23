@@ -391,30 +391,63 @@ async def generate_reviewer_feedback_with_ai(project_info, files, repo_name, tok
         "critical": critical_review
     }
 
-# 향상된 코드 리뷰 작성
-async def create_code_review(repo_name, pr_number, files, token, project_info):
+def extract_requirements_from_pr(payload):
+    """PR 제목, 본문에서 요구사항 추출"""
+    pr = payload.get("pull_request", {})
+
+    title = pr.get("title", "")
+    body = pr.get("body", "") or ""
+
+    # 요구사항 관련 키워드들
+    requirement_keywords = [
+        "요구사항", "requirement", "구현", "implement", "추가", "add",
+        "수정", "fix", "개선", "improve", "변경", "change", "기능", "feature",
+        "버그", "bug", "이슈", "issue", "문제", "problem", "리팩토링", "refactor"
+    ]
+
+    # 요구사항 추출
+    requirements = []
+
+    # 제목에서 추출
+    if any(keyword in title.lower() for keyword in requirement_keywords):
+        requirements.append(f"제목: {title}")
+
+    # 본문에서 요구사항 추출
+    if body:
+        for line in body.split('\n')[:5]:  # 처음 5줄만
+            line = line.strip()
+            if line and any(keyword in line.lower() for keyword in requirement_keywords):
+                requirements.append(f"설명: {line[:80]}")
+                break
+
+    # 요구사항이 없으면 기본값
+    if not requirements:
+        requirements = [f"기본작업: {title}"]
+
+    return " | ".join(requirements[:2])  # 최대 2개만
+
+# 클린코드 기반 코드 리뷰 작성 (신규)
+async def create_code_review_with_requirements(repo_name, pr_number, files, token, project_info, requirements):
+    """클린코드 기반 코드 리뷰 작성"""
     url = f"https://api.github.com/repos/{repo_name}/pulls/{pr_number}/reviews"
     headers = {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github.v3+json"
     }
 
-    # 3명의 리뷰어 피드백 생성
+    # 🎯 클린코드 기반 3명의 리뷰어 피드백 생성
     feedback = await generate_reviewer_feedback_with_ai(project_info, files, repo_name, token)
 
-    # 전체 리뷰 본문 작성
-    review_body = f"""# 🤖 Senior-Level Code Review
+    # 📍 클린코드 기반 인라인 코멘트 생성
+    line_comments = parse_diff_and_get_line_comments(files, feedback)
+    _LOGGER.info(f"생성된 클린코드 인라인 코멘트: {len(line_comments)}개")
 
-> **자동 코드 리뷰 v2.0** - AI 기반 3인 리뷰어 분석 결과
+    # 전체 리뷰 본문 (간결 버전)
+    review_body = f"""# 🧹 Clean Code Review
 
-## 📋 Pull Request 개요
+**요구사항:** {requirements}
 
-| 항목 | 내용 |
-|------|------|
-| **언어/프레임워크** | {project_info['language']} / {project_info['framework']} |
-| **브랜치** | `{project_info['branch']}` |
-| **변경사항** | {project_info['changes']['changed_files']}개 파일, +{project_info['changes']['additions']}/-{project_info['changes']['deletions']} 라인 |
-| **커밋수** | {project_info['changes']['commits']}개 |
+**변경사항:** {project_info['changes']['changed_files']}개 파일, +{project_info['changes']['additions']}/-{project_info['changes']['deletions']} 라인
 
 ---
 
@@ -430,49 +463,23 @@ async def create_code_review(repo_name, pr_number, files, token, project_info):
 
 ---
 
-## 🎯 종합 결론
+💡 각 변경된 라인에 Robert/Martin/Kent의 클린코드 피드백이 달렸습니다."""
 
-### ✅ **Approve 조건:**
-- [ ] Critical Issues 해결 완료
-- [ ] 보안 취약점 점검 완료
-- [ ] 성능 테스트 통과
-- [ ] 단위 테스트 작성/업데이트
-
-### 📝 **추천 Actions:**
-1. **우선순위 High:** 보안 관련 수정사항 적용
-2. **우선순위 Medium:** 성능 최적화 검토
-3. **우선순위 Low:** 코드 문서화 및 리팩토링
-
----
-
-*🔬 이 리뷰는 GPT-4o-mini 기반 AI 시스템에 의해 생성되었습니다.*
-*📧 추가 문의: 시니어 개발자에게 직접 문의하세요.*"""
-
-    # 파일별 코멘트 생성
-    comments = []
-    for file in files[:3]:  # 최대 3개 파일에만 코멘트
-        filename = file.get("filename", "")
-        if filename.endswith((".py", ".js", ".ts", ".java")):
-            comments.append({
-                "path": filename,
-                "position": 1,
-                "body": f"📝 **{filename}** 파일이 수정되었습니다. {project_info['language']} 코딩 표준을 준수했는지 확인해주세요."
-            })
-
+    # GitHub API 리뷰 데이터
     review_data = {
         "body": review_body,
         "event": "COMMENT",
-        "comments": comments
+        "comments": line_comments
     }
 
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, headers=headers, json=review_data)
             response.raise_for_status()
-            _LOGGER.info(f"PR #{pr_number}에 3명 리뷰어 피드백 작성 완료")
+            _LOGGER.info(f"PR #{pr_number}에 클린코드 리뷰 작성 완료")
             return True
     except Exception as e:
-        _LOGGER.error(f"리뷰 작성 실패: {str(e)}")
+        _LOGGER.error(f"클린코드 리뷰 작성 실패: {str(e)}")
         return False
 
 def verify_webhook_signature(payload_body, signature_header, secret):
@@ -489,6 +496,10 @@ def verify_webhook_signature(payload_body, signature_header, secret):
 async def handle_pull_request(payload):
     try:
         _LOGGER.info("풀 리퀘스트 이벤트 처리 시작")
+
+        # 🎯 PR 요구사항 추출 (필수!)
+        requirements = extract_requirements_from_pr(payload)
+        _LOGGER.info(f"추출된 요구사항: {requirements}")
 
         # 프로젝트 정보 분석
         project_info = analyze_project_info(payload)
@@ -512,11 +523,13 @@ async def handle_pull_request(payload):
         files = await get_pr_files(repo_name, pr_number, token)
         _LOGGER.info(f"변경된 파일 {len(files)}개 분석 완료")
 
-        # 3명 리뷰어의 코드 리뷰 작성
-        success = await create_code_review(repo_name, pr_number, files, token, project_info)
+        # 🔄 클린코드 기반 코드 리뷰 작성 (신규!)
+        success = await create_code_review_with_requirements(
+            repo_name, pr_number, files, token, project_info, requirements
+        )
 
         if success:
-            _LOGGER.info("3명 리뷰어 피드백 작성 성공")
+            _LOGGER.info("Robert/Martin/Kent 클린코드 리뷰 작성 성공")
         else:
             _LOGGER.error("리뷰 작성 실패")
 
