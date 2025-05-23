@@ -5,6 +5,8 @@ import logging
 import time
 import httpx
 import jwt
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema import HumanMessage, SystemMessage
@@ -13,11 +15,35 @@ from src.config.settings import GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, OPENAI_AP
 
 _LOGGER = logging.getLogger(__name__)
 
+def load_private_key_safely():
+    """Private Key를 cryptography 라이브러리로 안전하게 로드"""
+    if not GITHUB_APP_PRIVATE_KEY:
+        return None
+
+    try:
+        # PEM 형식의 private key를 로드
+        private_key = serialization.load_pem_private_key(
+            GITHUB_APP_PRIVATE_KEY.encode('utf-8'),
+            password=None
+        )
+        _LOGGER.info("✅ Private Key 로드 성공")
+        return private_key
+    except Exception as e:
+        _LOGGER.error(f"❌ Private Key 로드 실패: {str(e)}")
+        return None
+
+# Private Key 검증
+PRIVATE_KEY_OBJECT = load_private_key_safely()
+
 # OpenAI LLM 초기화
-llm = ChatOpenAI(
-    model="gpt-4o-mini",
-    temperature=0.3
-) if OPENAI_API_KEY else None
+try:
+    llm = ChatOpenAI(
+        model="gpt-4o-mini",
+        temperature=0.3
+    ) if OPENAI_API_KEY else None
+except Exception as e:
+    _LOGGER.warning(f"OpenAI 초기화 실패: {str(e)}")
+    llm = None
 
 # 리뷰어 페르소나별 프롬프트 템플릿
 REVIEWER_PROMPTS = {
@@ -67,21 +93,62 @@ REVIEWER_PROMPTS = {
 코드의 잠재적 위험 요소, 개선 필요사항, 품질 이슈를 엄격하게 검토하세요. 200자 내외로 작성하세요."""
 }
 
+def validate_github_private_key():
+    """GitHub App Private Key 형식을 검증하고 정보를 출력"""
+    if not GITHUB_APP_PRIVATE_KEY:
+        _LOGGER.error("❌ GitHub App Private Key가 설정되지 않았습니다")
+        return False
+
+    key = GITHUB_APP_PRIVATE_KEY.strip()
+
+    # PEM 형식 검증
+    if key.startswith("-----BEGIN PRIVATE KEY-----"):
+        _LOGGER.info("✅ PKCS#8 형식의 Private Key 감지됨")
+        return True
+    elif key.startswith("-----BEGIN RSA PRIVATE KEY-----"):
+        _LOGGER.info("✅ RSA 형식의 Private Key 감지됨")
+        return True
+    elif key.startswith("-----BEGIN OPENSSH PRIVATE KEY-----"):
+        _LOGGER.error("❌ OpenSSH 형식은 지원되지 않습니다. GitHub App은 RSA/PKCS#8 형식이 필요합니다")
+        return False
+    else:
+        _LOGGER.error(f"❌ 인식할 수 없는 Private Key 형식: {key[:50]}...")
+        return False
+
+# 애플리케이션 시작 시 검증
+if not validate_github_private_key():
+    _LOGGER.warning("⚠️ GitHub App Private Key 설정을 확인해주세요")
+    _LOGGER.warning("💡 현재 SSH fingerprint가 설정되어 있습니다. 실제 RSA private key가 필요합니다.")
+    _LOGGER.warning("🔗 GitHub App 설정 페이지에서 'Generate a private key'를 클릭하여 .pem 파일을 다운로드하세요.")
+
 # 설치 토큰 발급 함수
 async def get_installation_token(installation_id):
     try:
+        # 설정 검증
+        if not GITHUB_APP_PRIVATE_KEY:
+            _LOGGER.error("GitHub App Private Key가 설정되지 않았습니다")
+            return None
+
+        if not GITHUB_APP_ID:
+            _LOGGER.error("GitHub App ID가 설정되지 않았습니다")
+            return None
+
         # JWT 생성
         _LOGGER.info("JWT 생성 시작")
         now = int(time.time())
         payload = {
             "iat": now,
             "exp": now + 600,  # 10분 유효
-            "iss": GITHUB_APP_ID
+            "iss": int(GITHUB_APP_ID)  # App ID는 정수여야 함
         }
 
         # JWT 서명
-        jwt_token = jwt.encode(payload, GITHUB_APP_PRIVATE_KEY, algorithm="RS256")
-        _LOGGER.info("JWT 서명 완료")
+        try:
+            jwt_token = jwt.encode(payload, GITHUB_APP_PRIVATE_KEY, algorithm="RS256")
+            _LOGGER.info("JWT 서명 완료")
+        except Exception as e:
+            _LOGGER.error(f"JWT 서명 실패: {str(e)}")
+            return None
 
         # 설치 토큰 요청
         _LOGGER.info("설치 토큰 요청 시작")
@@ -93,12 +160,16 @@ async def get_installation_token(installation_id):
 
         async with httpx.AsyncClient() as client:
             response = await client.post(url, headers=headers)
-            response.raise_for_status()
+
+            if response.status_code != 201:
+                _LOGGER.error(f"토큰 요청 실패: {response.status_code} - {response.text}")
+                return None
+
             _LOGGER.info("설치 토큰 요청 완료")
             return response.json().get("token")
 
     except Exception as e:
-        _LOGGER.error(f"토큰 발급 오류: {str(e)}")
+        _LOGGER.error(f"토큰 발급 오류: {str(e)}", exc_info=True)
         return None
 
 # PR 파일 가져오기
