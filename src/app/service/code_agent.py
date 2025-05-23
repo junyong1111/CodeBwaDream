@@ -1,8 +1,10 @@
 import logging
 import json
+import json
 
 from fastapi import HTTPException, Request
 
+from src.app.helper import code_agent as agnet_helper
 from src.app.helper import code_agent as agnet_helper
 from src.config.settings import (
     GITHUB_APP_ID,
@@ -18,14 +20,16 @@ async def get_code_review_agent_service(request: Request):
         _LOGGER.info("웹훅 서명 검증 시작")
         if GITHUB_WEBHOOK_SECRET:
             signature = request.headers.get("X-Hub-Signature-256")
-            raw_body = await request.body()
-            if not agnet_helper.verify_webhook_signature(raw_body, signature, GITHUB_WEBHOOK_SECRET):
+            if not agnet_helper.verify_webhook_signature(await request.body(), signature, GITHUB_WEBHOOK_SECRET):
                 _LOGGER.error("잘못된 웹훅 서명")
                 raise HTTPException(status_code=401, detail="잘못된 웹훅 서명")
 
         # GitHub 이벤트 타입 확인
         _LOGGER.info("GitHub 이벤트 타입 확인 시작")
         event_type = request.headers.get("X-GitHub-Event")
+
+
+        # 페이로드 파싱 및 로깅
 
         # 헤더 정보 로깅
         _LOGGER.info(f"웹훅 헤더 정보: {dict(request.headers)}")
