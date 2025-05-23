@@ -49,7 +49,7 @@ except Exception as e:
 
 # 클린코드 기반 리뷰어 프롬프트
 REVIEWER_PROMPTS = {
-    "positive": """당신은 Robert (클린코드 전문가)입니다. 변경사항에서 클린코드 원칙이 잘 적용된 부분을 찾아 구체적으로 칭찬하세요.
+    "positive": """당신은 격려(클린코드 전문가)입니다. 변경사항에서 클린코드 원칙이 잘 적용된 부분을 찾아 구체적으로 칭찬하세요.
 
 **요구사항:** {requirements}
 **변경 분석:** {diff_analysis}
@@ -59,12 +59,11 @@ REVIEWER_PROMPTS = {
 ✅ DRY (중복 제거) 적용
 ✅ 의미있는 네이밍
 ✅ 함수 책임의 명확성
-✅ 추상화 레벨 일관성
 
-예시: "함수명이 의도를 명확히 표현함. SRP 원칙 잘 지켜짐."
+예시: "함수명이 의도를 명확히 표현함. 예시: calculate_total() → 계산 목적 명확"
 """,
 
-    "neutral": """당신은 Martin (리팩토링 전문가)입니다. 변경사항을 클린코드 관점에서 객관적으로 분석하세요.
+    "neutral": """당신은 분석(리팩토링 전문가)입니다. 변경사항을 클린코드 관점에서 객관적으로 분석하세요.
 
 **요구사항:** {requirements}
 **변경 분석:** {diff_analysis}
@@ -73,24 +72,21 @@ REVIEWER_PROMPTS = {
 ⚖️ 코드 복잡도 vs 가독성
 ⚖️ 성능 vs 유지보수성
 ⚖️ 추상화 vs 구체성
-⚖️ 확장성 vs 단순성
 
-예시: "가독성은 향상됐지만 복잡도 증가. 함수 분리 고려 필요."
+예시: "가독성은 향상됐지만 복잡도 증가. 예시: 함수 분리 고려"
 """,
 
-    "critical": """당신은 Kent (코드 품질 감시자)입니다. 클린코드 원칙 위반 사항을 엄격히 지적하세요.
+    "critical": """당신은 지적(코드 품질 감시자)입니다. 클린코드 원칙 위반 사항을 엄격히 지적하세요.
 
 **요구사항:** {requirements}
 **변경 분석:** {diff_analysis}
 
 다음 클린코드 위반사항 점검 (30자 내외):
 🚨 Long Method (함수가 너무 긴가?)
-🚨 God Object (클래스가 너무 많은 책임을 지는가?)
 🚨 Magic Number (의미없는 숫자 사용)
-🚨 Duplicate Code (중복 코드 존재)
 🚨 Poor Naming (의미불명한 변수/함수명)
 
-예시: "35라인 함수는 너무 김. 3개 이하 함수로 분리 필요."
+예시: "35라인 함수는 너무 김. 예시: 3개 함수로 분리 필요"
 """
 }
 
@@ -251,7 +247,7 @@ async def get_file_content(repo_name, file_path, token, sha=None):
         _LOGGER.error(f"파일 내용 가져오기 실패 {file_path}: {str(e)}")
         return None
 
-async def analyze_files_with_ai(files, project_info, repo_name, token):
+async def analyze_files_with_ai(files, project_info, repo_name, token, requirements):
     """AI를 활용하여 변경된 파일들을 분석"""
     if not llm:
         return {
@@ -341,7 +337,8 @@ async def analyze_files_with_ai(files, project_info, repo_name, token):
                 changed_files=project_info["changes"]["changed_files"],
                 additions=project_info["changes"]["additions"],
                 deletions=project_info["changes"]["deletions"],
-                file_changes=file_changes_text
+                file_changes=file_changes_text,
+                requirements=requirements
             )
 
             response = await llm.ainvoke([SystemMessage(content=prompt)])
@@ -354,35 +351,21 @@ async def analyze_files_with_ai(files, project_info, repo_name, token):
     return ai_reviews
 
 # 3명의 리뷰어 페르소나 정의 (AI 강화 버전)
-async def generate_reviewer_feedback_with_ai(project_info, files, repo_name, token):
-    """AI를 활용한 3명의 리뷰어(긍정, 중립, 부정) 피드백 생성 - 시니어급"""
-    language = project_info["language"]
-    framework = project_info["framework"]
-    changes = project_info["changes"]
-    branch = project_info["branch"]
+async def generate_reviewer_feedback_with_ai(project_info, files, repo_name, token, requirements):
+    """AI를 활용한 3명의 리뷰어 피드백 생성 - 간결 버전"""
+    # AI 분석 실행 (요구사항 포함)
+    ai_reviews = await analyze_files_with_ai(files, project_info, repo_name, token, requirements)
 
-    # AI 분석 실행
-    ai_reviews = await analyze_files_with_ai(files, project_info, repo_name, token)
-
-    # 📊 변경사항 요약
-    change_summary = f"""
-**📊 변경사항 요약:**
-- **언어/프레임워크:** {language}/{framework}
-- **브랜치:** `{branch}`
-- **파일:** {changes['changed_files']}개 | **라인:** +{changes['additions']}/-{changes['deletions']}
-- **커밋:** {changes['commits']}개
-"""
-
-    # 🌟 Robert (긍정적 리뷰어) - 클린코드 전문가
-    positive_review = f"""## ✅ Robert
+    # 격려 (긍정형) - 클린코드 전문가
+    positive_review = f"""## ✅ 격려
 {ai_reviews['positive']}"""
 
-    # ⚖️ Martin (중립적 리뷰어) - 리팩토링 전문가
-    neutral_review = f"""## ⚖️ Martin
+    # 분석 (중립형) - 리팩토링 전문가
+    neutral_review = f"""## ⚖️ 분석
 {ai_reviews['neutral']}"""
 
-    # 🔍 Kent (비판적 리뷰어) - 코드 품질 감시자
-    critical_review = f"""## 🚨 Kent
+    # 지적 (비판형) - 코드 품질 감시자
+    critical_review = f"""## 🚨 지적
 {ai_reviews['critical']}"""
 
     return {
@@ -408,8 +391,8 @@ def extract_requirements_from_pr(payload):
     # 요구사항 추출
     requirements = []
 
-    # 제목에서 추출
-    if any(keyword in title.lower() for keyword in requirement_keywords):
+    # 제목에서 추출 (항상 포함)
+    if title.strip():
         requirements.append(f"제목: {title}")
 
     # 본문에서 요구사항 추출
@@ -420,11 +403,14 @@ def extract_requirements_from_pr(payload):
                 requirements.append(f"설명: {line[:80]}")
                 break
 
-    # 요구사항이 없으면 기본값
-    if not requirements:
-        requirements = [f"기본작업: {title}"]
+    # 기본값 처리 - 빈 경우 자동 생성
+    if not requirements or not any(req.strip() for req in requirements):
+        requirements = [f"기본작업: 코드 개선 및 수정"]
 
-    return " | ".join(requirements[:2])  # 최대 2개만
+    result = " | ".join(requirements[:2])  # 최대 2개만
+
+    # 빈 문자열 방지
+    return result if result.strip() else "기본작업: 코드 품질 개선"
 
 # 클린코드 기반 코드 리뷰 작성 (신규)
 async def create_code_review_with_requirements(repo_name, pr_number, files, token, project_info, requirements):
@@ -436,14 +422,14 @@ async def create_code_review_with_requirements(repo_name, pr_number, files, toke
     }
 
     # 🎯 클린코드 기반 3명의 리뷰어 피드백 생성
-    feedback = await generate_reviewer_feedback_with_ai(project_info, files, repo_name, token)
+    feedback = await generate_reviewer_feedback_with_ai(project_info, files, repo_name, token, requirements)
 
     # 📍 클린코드 기반 인라인 코멘트 생성
     line_comments = parse_diff_and_get_line_comments(files, feedback)
     _LOGGER.info(f"생성된 클린코드 인라인 코멘트: {len(line_comments)}개")
 
     # 전체 리뷰 본문 (간결 버전)
-    review_body = f"""# 🧹 Clean Code Review
+    review_body = f"""# 🧹 클린코드 리뷰
 
 **요구사항:** {requirements}
 
@@ -463,7 +449,7 @@ async def create_code_review_with_requirements(repo_name, pr_number, files, toke
 
 ---
 
-💡 각 변경된 라인에 Robert/Martin/Kent의 클린코드 피드백이 달렸습니다."""
+💡 각 변경된 라인에 격려/분석/지적의 클린코드 피드백이 달렸습니다."""
 
     # GitHub API 리뷰 데이터
     review_data = {
@@ -624,58 +610,58 @@ def parse_diff_and_get_line_comments(files, ai_reviews):
                 # 중요한 변경사항만 코멘트 달기
                 if any(keyword in added_line for keyword in ['def ', 'class ', 'async ', 'await ', 'import ', 'from ']):
 
-                    # Robert/Martin/Kent 중 하나를 순환하면서 선택
-                    reviewer_names = ["Robert", "Martin", "Kent"]
+                    # 격려/분석/지적 중 하나를 순환하면서 선택
+                    reviewer_names = ["격려", "분석", "지적"]
                     reviewer_name = reviewer_names[i % 3]
 
-                    # 클린코드 기반 실제 변경사항 분석
+                    # 클린코드 기반 실제 변경사항 분석 + 구체적 예시
                     if 'def ' in added_line and len(added_line.strip()) > 80:
                         comments_pool = [
-                            f"**{reviewer_name}**: 함수 시그니처가 깔끔함 👍",
-                            f"**{reviewer_name}**: 파라미터 5개 이상이면 객체로 묶어보세요",
-                            f"**{reviewer_name}**: 함수명이 동사+명사 패턴 좋음"
+                            f"**{reviewer_name}**: 함수 시그니처가 깔끔함. 예시: 파라미터명이 명확함",
+                            f"**{reviewer_name}**: 파라미터 5개 이상이면 객체로 묶어보세요. 예시: UserData 클래스 활용",
+                            f"**{reviewer_name}**: 함수명이 동사+명사 패턴 좋음. 예시: calculate_score()"
                         ]
                     elif 'async def' in added_line:
                         comments_pool = [
-                            f"**{reviewer_name}**: 비동기 함수명에 'async' 표시 없어도 됨",
-                            f"**{reviewer_name}**: 비동기 처리 관심사 분리 잘됨",
-                            f"**{reviewer_name}**: 함수 길이 15라인 이하로 유지하세요"
+                            f"**{reviewer_name}**: 비동기 함수명 깔끔함. 예시: async 접두사 불필요",
+                            f"**{reviewer_name}**: 비동기 처리 관심사 분리 잘됨. 예시: 단일 책임 유지",
+                            f"**{reviewer_name}**: 함수 길이 15라인 이하로 유지하세요. 예시: 3개 함수로 분리"
                         ]
                     elif 'class ' in added_line:
                         comments_pool = [
-                            f"**{reviewer_name}**: 클래스명 PascalCase 좋음",
-                            f"**{reviewer_name}**: 단일 책임 원칙 확인 필요",
-                            f"**{reviewer_name}**: 상속보다 컴포지션 고려해보세요"
+                            f"**{reviewer_name}**: 클래스명 PascalCase 좋음. 예시: UserManager",
+                            f"**{reviewer_name}**: 단일 책임 원칙 확인 필요. 예시: 역할별 클래스 분리",
+                            f"**{reviewer_name}**: 상속보다 컴포지션 고려. 예시: 인터페이스 활용"
                         ]
                     elif 'import ' in added_line:
                         comments_pool = [
-                            f"**{reviewer_name}**: import 순서: 표준→서드파티→로컬",
-                            f"**{reviewer_name}**: 순환 import 위험 체크",
-                            f"**{reviewer_name}**: 사용하지 않는 import 정리하세요"
+                            f"**{reviewer_name}**: import 순서 좋음. 예시: 표준→서드파티→로컬",
+                            f"**{reviewer_name}**: 순환 import 위험 체크. 예시: 모듈 의존성 확인",
+                            f"**{reviewer_name}**: 사용하지 않는 import 정리하세요. 예시: unused import 제거"
                         ]
                     elif len(added_line.strip()) > 100:
                         comments_pool = [
-                            f"**{reviewer_name}**: 한 라인이 너무 김. 80자 이하 권장",
-                            f"**{reviewer_name}**: 체이닝보다 중간 변수 사용 고려",
-                            f"**{reviewer_name}**: 복잡한 표현식은 함수로 추출하세요"
+                            f"**{reviewer_name}**: 한 라인이 너무 김. 예시: 80자 이하 권장",
+                            f"**{reviewer_name}**: 체이닝보다 중간 변수 사용. 예시: result = step1().step2()",
+                            f"**{reviewer_name}**: 복잡한 표현식 함수로 추출. 예시: is_valid_user() 함수"
                         ]
                     elif any(magic in added_line for magic in ['5', '10', '100', '1000']):
                         comments_pool = [
-                            f"**{reviewer_name}**: Magic Number 발견. 상수로 정의하세요",
-                            f"**{reviewer_name}**: 의미있는 상수명으로 추출 필요",
-                            f"**{reviewer_name}**: 하드코딩된 숫자는 설정으로 분리"
+                            f"**{reviewer_name}**: Magic Number 발견. 예시: MAX_RETRY_COUNT = 5",
+                            f"**{reviewer_name}**: 의미있는 상수명으로 추출. 예시: DEFAULT_TIMEOUT = 30",
+                            f"**{reviewer_name}**: 하드코딩된 숫자는 설정으로 분리. 예시: config.json 활용"
                         ]
                     elif 'return ' in added_line and len(added_line.split('return')[1].strip()) > 50:
                         comments_pool = [
-                            f"**{reviewer_name}**: 복잡한 return문. 중간 변수 사용 권장",
-                            f"**{reviewer_name}**: Early Return 패턴 적용해보세요",
-                            f"**{reviewer_name}**: 조건부 반환은 가드 클로즈 사용"
+                            f"**{reviewer_name}**: 복잡한 return문. 예시: result 변수 활용",
+                            f"**{reviewer_name}**: Early Return 패턴 적용. 예시: if not valid: return None",
+                            f"**{reviewer_name}**: 조건부 반환은 가드 클로즈 사용. 예시: 예외 케이스 먼저 처리"
                         ]
                     else:
                         comments_pool = [
-                            f"**{reviewer_name}**: 코드 의도가 명확함",
-                            f"**{reviewer_name}**: 변수명이 의미를 잘 표현함",
-                            f"**{reviewer_name}**: 적절한 추상화 레벨 유지"
+                            f"**{reviewer_name}**: 코드 의도가 명확함. 예시: 변수명이 목적 표현",
+                            f"**{reviewer_name}**: 변수명이 의미를 잘 표현. 예시: user_count vs count",
+                            f"**{reviewer_name}**: 적절한 추상화 레벨 유지. 예시: 비즈니스 로직 분리"
                         ]
 
                     # 리뷰어별로 다른 스타일의 코멘트 선택
