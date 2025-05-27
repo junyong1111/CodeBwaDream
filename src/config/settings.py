@@ -1,9 +1,12 @@
 import os
+import logging
 import base64
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+_LOGGER = logging.getLogger(__name__)
 
 GITHUB_APP_ID = os.getenv("GITHUB_APP_ID")
 
@@ -71,3 +74,21 @@ def get_github_private_key():
 GITHUB_APP_PRIVATE_KEY = get_github_private_key()
 GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# --- Code Review Agent Configuration ---
+# 최대 분석 파일 수 (전체 PR 리뷰 및 라인 코멘트 생성 시)
+MAX_FILES_TO_ANALYZE = int(os.getenv("MAX_FILES_TO_ANALYZE", "3"))
+# 파일당 최대 인라인 코멘트 수
+MAX_LINE_COMMENTS_PER_FILE = int(os.getenv("MAX_LINE_COMMENTS_PER_FILE", "3"))
+# Diff 분석 시 파일당 추가/삭제 라인 수 제한
+MAX_ADDED_LINES_PER_FILE_DIFF = int(os.getenv("MAX_ADDED_LINES_PER_FILE_DIFF", "5"))
+MAX_REMOVED_LINES_PER_FILE_DIFF = int(os.getenv("MAX_REMOVED_LINES_PER_FILE_DIFF", "3"))
+# PR 본문 요약 길이
+MAX_PR_BODY_LENGTH_FOR_REQUIREMENTS = int(os.getenv("MAX_PR_BODY_LENGTH_FOR_REQUIREMENTS", "500"))
+PR_BODY_SUMMARY_PREFIX_LENGTH = int(os.getenv("PR_BODY_SUMMARY_PREFIX_LENGTH", "250"))
+PR_BODY_SUMMARY_SUFFIX_LENGTH = int(os.getenv("PR_BODY_SUMMARY_SUFFIX_LENGTH", "150"))
+
+_LOGGER.info(f"GitHub App ID: {GITHUB_APP_ID}")
+_LOGGER.info(f"OpenAI API Key Loaded: {bool(OPENAI_API_KEY)}")
+_LOGGER.info(f"Max files to analyze: {MAX_FILES_TO_ANALYZE}")
+_LOGGER.info(f"Max line comments per file: {MAX_LINE_COMMENTS_PER_FILE}")
