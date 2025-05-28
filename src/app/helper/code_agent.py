@@ -18,12 +18,11 @@ from src.config.settings import (
     GITHUB_APP_PRIVATE_KEY,
     OPENAI_API_KEY,
     MAX_FILES_TO_ANALYZE,
-    MAX_LINE_COMMENTS_PER_FILE,
-    MAX_ADDED_LINES_PER_FILE_DIFF,
-    MAX_REMOVED_LINES_PER_FILE_DIFF,
     MAX_PR_BODY_LENGTH_FOR_REQUIREMENTS,
     PR_BODY_SUMMARY_PREFIX_LENGTH,
-    PR_BODY_SUMMARY_SUFFIX_LENGTH
+    PR_BODY_SUMMARY_SUFFIX_LENGTH,
+    MAX_ADDED_LINES_PER_FILE_DIFF,
+    MAX_REMOVED_LINES_PER_FILE_DIFF,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -72,19 +71,20 @@ def get_dynamic_reviewer_prompts():
 
 다음 지침에 따라 **실제 시니어 개발자 수준의 전문적인 피드백**을 작성해주세요:
 
-1. **Before vs After 분석**: 변경 전후 코드를 비교하여 구체적으로 무엇이 개선되었는지 분석
-2. **요구사항 충족도**: PR 요구사항과 실제 구현의 일치도를 구체적으로 평가
+1. **요구사항 충족도**: PR 요구사항이 어떻게 잘 구현되었는지 구체적으로 분석
+2. **Before vs After 개선점**: 변경 전후 코드를 비교하여 구체적으로 무엇이 개선되었는지 분석
 3. **코드 품질 향상점**: 아키텍처, 성능, 가독성, 유지보수성 관점에서 잘된 점을 구체적인 코드 예시와 함께 설명
 4. **기술적 우수성**: 사용된 패턴, 라이브러리, 접근방식의 장점을 전문적으로 분석
-5. **비즈니스 가치**: 이 변경이 프로젝트에 미치는 긍정적 영향 분석
 
 **출력 형식**:
-- 각 포인트마다 실제 코드 라인을 인용하여 구체적으로 설명
-- 150-200자 내외로 충분히 상세하게 작성
-- 전문 용어를 사용하되 명확하게 설명
-- "✅ [핵심키워드]: [구체적 분석 및 코드 예시]" 형태
+- 실제 변경된 코드 라인을 인용하여 구체적으로 설명
+- 각 포인트를 명확한 제목과 함께 구조화
+- "✅ [핵심키워드]: [구체적 분석 및 코드 예시]" 형태로 작성
 
-예시: "✅ 아키텍처 설계: `src/app/service/` 구조로 계층 분리하여 단일 책임 원칙을 준수. 비즈니스 로직과 컨트롤러 분리로 테스트 용이성과 유지보수성 크게 향상됨."
+예시:
+✅ **요구사항 반영**: PR 요구사항인 "라인별 댓글 제거"가 `comments` 필드 완전 제거로 정확히 구현됨
+✅ **코드 품질**: `create_code_review_with_requirements()` 함수에서 불필요한 `generate_ai_line_comments()` 호출 제거로 성능 향상
+✅ **사용자 경험**: 통합 리뷰 방식으로 변경하여 PR 가독성과 리뷰 효율성 대폭 개선
 """,
 
         "neutral": """당신은 시스템 아키텍트 "드" 입니다. 변경된 코드를 중립적이고 분석적 관점에서 전문적으로 검토합니다.
@@ -98,17 +98,18 @@ def get_dynamic_reviewer_prompts():
 
 1. **트레이드오프 분석**: 이 변경으로 인한 장단점을 구체적으로 분석 (성능 vs 가독성, 복잡성 vs 유연성 등)
 2. **확장성 고려사항**: 향후 기능 추가나 변경 시 이 구조가 미칠 영향 분석
-3. **의존성 및 결합도**: 모듈간 의존성 변화와 결합도 영향 분석
-4. **대안적 접근법**: 다른 구현 방식과의 비교 및 현재 선택의 타당성 검토
-5. **잠재적 고려사항**: 현재는 문제없지만 향후 고려해야 할 사항들
+3. **대안적 접근법**: 다른 구현 방식과의 비교 및 현재 선택의 타당성 검토
+4. **잠재적 고려사항**: 현재는 문제없지만 향후 고려해야 할 사항들
 
 **출력 형식**:
-- 각 분석마다 구체적인 코드 변경사항을 근거로 제시
-- 150-200자 내외로 충분히 상세하게 작성
-- 객관적이고 균형잡힌 시각으로 분석
-- "⚖️ [분석영역]: [구체적 트레이드오프 분석 및 고려사항]" 형태
+- 구체적인 코드 변경사항을 근거로 객관적 분석
+- 각 분석을 명확한 제목과 함께 구조화
+- "⚖️ [분석영역]: [구체적 트레이드오프 분석 및 고려사항]" 형태로 작성
 
-예시: "⚖️ 성능 vs 유지보수성: `async/await` 패턴 도입으로 비동기 처리 성능은 향상되나, 디버깅 복잡도 증가. 현재 규모에서는 적절하나 팀의 비동기 프로그래밍 숙련도 고려 필요."
+예시:
+⚖️ **성능 vs 기능성**: 라인별 댓글 제거로 API 호출 횟수와 처리 시간은 감소하나, 세부적인 코드별 피드백 기능 상실
+⚖️ **유지보수성**: 통합 리뷰 방식으로 코드 복잡도는 감소했으나, 향후 선택적 라인 댓글 기능이 필요할 경우 재구현 필요
+⚖️ **사용자 경험**: 깔끔한 리뷰 형태로 가독성은 향상되나, 구체적인 라인별 지적사항 확인이 어려워질 수 있음
 """,
 
         "critical": """당신은 코드 품질 전문가 "림" 입니다. 변경된 코드를 비판적 관점에서 전문적으로 검토하여 개선점을 제시합니다.
@@ -120,19 +121,20 @@ def get_dynamic_reviewer_prompts():
 
 다음 지침에 따라 **실제 시니어 전문가 수준의 비판적 피드백**을 작성해주세요:
 
-1. **코드 품질 이슈**: 잠재적 버그, 성능 문제, 보안 취약점을 구체적 코드와 함께 지적
-2. **설계 원칙 위반**: SOLID, DRY, KISS 등 설계 원칙 위반 사항과 개선 방안
-3. **베스트 프랙티스 미준수**: 해당 언어/프레임워크의 관례나 모범 사례 미준수 사항
-4. **테스트 가능성**: 현재 코드의 테스트 작성 어려움과 개선 방안
-5. **구체적 개선 제안**: 실제 코드 예시와 함께 명확한 개선 방법 제시
+1. **잠재적 문제점**: 코드 품질, 성능, 보안, 확장성 관점에서 개선이 필요한 부분
+2. **설계 원칙 검토**: SOLID, DRY, KISS 등 설계 원칙 관점에서의 개선 방안
+3. **베스트 프랙티스**: 해당 언어/프레임워크의 관례나 모범 사례 준수 여부
+4. **구체적 개선 제안**: 실제 코드 예시와 함께 명확한 개선 방법 제시
 
 **출력 형식**:
-- 각 문제점마다 해당 코드 라인을 정확히 인용
-- 150-200자 내외로 충분히 상세하게 작성
 - 문제점과 함께 반드시 구체적인 해결책 제시
-- "🚨 [문제영역]: [구체적 문제점 및 개선방안]" 형태
+- 각 개선사항을 명확한 제목과 함께 구조화
+- "🚨 [문제영역]: [구체적 문제점 및 개선방안]" 형태로 작성
 
-예시: "🚨 예외 처리 부재: `await get_installation_token()` 호출 시 네트워크 오류나 인증 실패에 대한 예외 처리 없음. `try-except`로 `httpx.RequestError` 처리하고 적절한 fallback 로직 추가 필요."
+예시:
+🚨 **기능 완전성**: 라인별 댓글 기능을 완전히 제거했으나, 중요한 보안 이슈나 버그는 여전히 라인별 지적이 필요할 수 있음. 선택적 라인 댓글 옵션 고려 필요
+🚨 **설정 관리**: `generate_ai_line_comments()` 함수는 삭제했으나 관련 상수들은 여전히 남아있어 코드 정리 필요
+🚨 **에러 처리**: 통합 리뷰 생성 실패 시 fallback 메커니즘 부재. 최소한의 기본 리뷰라도 제공할 수 있는 예외 처리 로직 추가 권장
 """
     }
 
@@ -419,7 +421,7 @@ async def generate_reviewer_feedback_with_ai(project_info, files, repo_name, tok
 {ai_reviews.get('neutral', '피드백 생성 중 오류 발생')}"""
 
     # 부정 리뷰 ("림")
-    critical_review = f"""## 🚨 림 (개선점 지적)
+    critical_review = f"""## 🚨 림 (개선 관점)
 {ai_reviews.get('critical', '피드백 생성 중 오류 발생')}"""
 
     return {
@@ -430,7 +432,7 @@ async def generate_reviewer_feedback_with_ai(project_info, files, repo_name, tok
 
 # AI 기반 코드 리뷰 작성 (신규)
 async def create_code_review_with_requirements(repo_name, pr_number, files, token, project_info, requirements):
-    """AI 완전 위임 기반 코드 리뷰 작성"""
+    """AI 완전 위임 기반 코드 리뷰 작성 - 하이브리드 방식 (통합 리뷰 + 선택적 라인 댓글)"""
     url = f"https://api.github.com/repos/{repo_name}/pulls/{pr_number}/reviews"
     headers = {
         "Authorization": f"token {token}",
@@ -440,51 +442,60 @@ async def create_code_review_with_requirements(repo_name, pr_number, files, toke
     # 🎯 AI 완전 위임 기반 3명의 리뷰어 피드백 생성
     feedback = await generate_reviewer_feedback_with_ai(project_info, files, repo_name, token, requirements)
 
-    # 📍 AI 기반 인라인 코멘트 생성
-    line_comments = await generate_ai_line_comments(files, requirements)
-    _LOGGER.info(f"생성된 AI 인라인 코멘트: {len(line_comments)}개")
+    # 🚨 중요한 이슈만 선별적으로 라인 댓글 생성
+    critical_line_comments = await generate_critical_line_comments(files, requirements)
+    _LOGGER.info(f"생성된 중요 이슈 라인 댓글: {len(critical_line_comments)}개")
 
-    # 전체 리뷰 본문 (AI 기반)
-    review_body = f"""# 🤖 **시니어 개발자 AI 코드 리뷰**
+    # 라인 댓글 요약 정보
+    line_comment_summary = ""
+    if critical_line_comments:
+        line_comment_summary = f"\n\n> 💡 **중요 이슈 {len(critical_line_comments)}개**를 해당 코드 라인에 직접 댓글로 표시했습니다. 보안, 성능, 품질 문제 중심으로 선별했습니다."
+    else:
+        line_comment_summary = "\n\n> ✅ **중요한 이슈 없음**: 보안, 성능, 품질 관점에서 즉시 수정이 필요한 문제는 발견되지 않았습니다."
 
-## 📋 **리뷰 요약**
+    # 전체 리뷰 본문 (AI 기반) - 통합 리뷰 + 라인 댓글 안내
+    review_body = f"""# 🤖 **AI 코드 리뷰 완료**
+
+## 📋 **리뷰 개요**
 - **PR 요구사항**: {requirements}
-- **변경 규모**: {project_info['changes']['changed_files']}개 파일, +{project_info['changes']['additions']}/-{project_info['changes']['deletions']} 라인
-- **리뷰 관점**: 3명의 시니어 전문가 관점 (긍정적/분석적/비판적)
+- **변경 규모**: {project_info['changes']['changed_files']}개 파일, +{project_info['changes']['additions']}/-{project_info['changes']['deletions']} 라인{line_comment_summary}
 
 ---
 
-## ✅ **봐 (시니어 개발자 - 긍정적 관점)**
+## ✅ **봐 (긍정적 관점)**
 {feedback['positive']}
 
 ---
 
-## ⚖️ **드 (시스템 아키텍트 - 분석적 관점)**
+## ⚖️ **드 (분석적 관점)**
 {feedback['neutral']}
 
 ---
 
-## 🚨 **림 (코드 품질 전문가 - 비판적 관점)**
+## 🚨 **림 (개선 관점)**
 {feedback['critical']}
 
 ---
 
-## 💡 **리뷰 완료**
-각 변경된 라인에 대해 Before/After 비교 분석과 트레이드오프 검토를 완료했습니다.
-인라인 코멘트에서 구체적인 개선 방안을 확인하세요."""
+## 🎯 **리뷰 결론**
+변경된 코드에 대한 Before/After 비교 분석과 트레이드오프 검토를 완료했습니다.
+중요한 이슈는 해당 라인에 직접 댓글로 표시했으니 확인해주세요! 🚀"""
 
-    # GitHub API 리뷰 데이터
+    # GitHub API 리뷰 데이터 - 하이브리드 방식 (통합 리뷰 + 선택적 라인 댓글)
     review_data = {
         "body": review_body,
-        "event": "COMMENT",
-        "comments": line_comments
+        "event": "COMMENT"
     }
+
+    # 중요한 이슈가 있을 때만 라인 댓글 추가
+    if critical_line_comments and len(critical_line_comments) > 0:
+        review_data["comments"] = critical_line_comments
 
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, headers=headers, json=review_data)
             response.raise_for_status()
-            _LOGGER.info(f"PR #{pr_number}에 AI 기반 코드 리뷰 작성 완료")
+            _LOGGER.info(f"PR #{pr_number}에 AI 기반 하이브리드 코드 리뷰 작성 완료 (라인 댓글: {len(critical_line_comments)}개)")
             return True
     except Exception as e:
         _LOGGER.error(f"AI 코드 리뷰 작성 실패: {str(e)}")
@@ -636,150 +647,121 @@ async def post_simple_comment(repo_name, pr_number, token, message):
         _LOGGER.error(f"알림 코멘트 작성 실패: {str(e)}")
         return False
 
-async def generate_ai_line_comments(files, requirements):
-    """AI가 실제 변경된 라인별로 정확한 코멘트 생성. 파일 확장자 및 함수/클래스 컨텍스트 활용."""
+async def generate_critical_line_comments(files, requirements):
+    """중요한 이슈만 선별하여 라인별 댓글 생성 - 보안, 버그, 성능 문제 중심"""
     if not llm:
         return []
 
-    line_comments = []
+    critical_comments = []
 
-    reviewer_perspectives = ["positive", "neutral", "critical"]  # 사용 가능한 관점 리스트
-    perspective_idx = 0 # 현재 관점 인덱스
-
-    for file in files[:MAX_FILES_TO_ANALYZE]:  # 설정값 사용
+    for file in files[:MAX_FILES_TO_ANALYZE]:
         filename = file.get("filename", "")
         patch = file.get("patch", "")
 
         if not patch:
             continue
 
-        # 파일 확장자 추출
-        file_extension = filename.split('.')[-1] if '.' in filename else "unknown"
-
-        significant_changes = []
+        # 중요한 변경사항만 추출
+        critical_changes = []
         lines = patch.split('\n')
-        current_hunk_start_line = 0
-        lines_in_hunk_counter = 0
-        current_context_info = "전역 범위 또는 컨텍스트 파악 불가" # 함수/클래스명 등
+        current_line_number = 0
 
-        for line_idx, line_content in enumerate(lines):
-            if line_content.startswith('@@'):
+        for line in lines:
+            if line.startswith('@@'):
                 import re
-                match = re.search(r'\+(\d+)', line_content)
+                match = re.search(r'\+(\d+)', line)
                 if match:
-                    current_hunk_start_line = int(match.group(1))
-                    lines_in_hunk_counter = 0
-
-                # Hunk 헤더에서 함수/클래스명으로 추정되는 정보 추출 (best-effort)
-                # 예: @@ -1,7 +1,7 @@ def my_function(param):
-                # 예: @@ -20,5 +20,5 @@ class MyClass:
-                context_match = re.search(r'@@ .* @@(.*)', line_content)
-                if context_match:
-                    extracted_context = context_match.group(1).strip()
-                    if extracted_context and not extracted_context.startswith(('+', '-', '@')):
-                         # class, def, function 등의 키워드가 포함된 경우 컨텍스트로 간주
-                        if any(kw in extracted_context.lower() for kw in ['class ', 'def ', 'function ', 'const ', 'let ', 'var ', 'module ']):
-                            current_context_info = extracted_context
-                        elif '(' in extracted_context and ')' in extracted_context: # 괄호가 있으면 함수/메서드 시그니처로 간주
-                            current_context_info = extracted_context
-
-
+                    current_line_number = int(match.group(1))
                 continue
 
-            if line_content.startswith('+') and not line_content.startswith('+++'):
-                actual_line_number_in_file = current_hunk_start_line + lines_in_hunk_counter
-                added_line = line_content[1:].strip()
+            if line.startswith('+') and not line.startswith('+++'):
+                code_line = line[1:].strip()
 
-                if (added_line and
-                    not added_line.startswith(('#', '//', '/*', '*', '{', '}', ')', '(')) and # 단순 기호로 시작하는 라인 제외 강화
-                    len(added_line) > 10):
+                # 중요한 이슈가 될 수 있는 패턴들 감지
+                critical_patterns = [
+                    # 보안 관련
+                    ('password', '비밀번호 하드코딩'),
+                    ('secret', '시크릿 하드코딩'),
+                    ('api_key', 'API 키 하드코딩'),
+                    ('eval(', 'eval 사용 위험'),
+                    ('exec(', 'exec 사용 위험'),
+                    ('shell=True', '쉘 인젝션 위험'),
 
-                    significant_changes.append({
-                        'file_line_number': actual_line_number_in_file,
-                        'code': added_line,
-                        'context_info': current_context_info # 현재 코드 라인이 속한 컨텍스트
-                    })
-                lines_in_hunk_counter +=1
+                    # 성능 관련
+                    ('for.*in.*range.*len', '비효율적 반복문'),
+                    ('time.sleep', '동기 sleep 사용'),
+                    ('requests.get', '비동기 환경에서 동기 HTTP'),
 
-            elif line_content.startswith(' ') and not line_content.startswith('---'):
-                lines_in_hunk_counter +=1
+                    # 에러 처리 관련
+                    ('except:', '광범위한 예외 처리'),
+                    ('pass', '빈 예외 처리'),
 
-        if significant_changes:
-            # 현재 파일에 적용할 리뷰어 관점 선택 (순환)
-            current_perspective = reviewer_perspectives[perspective_idx % len(reviewer_perspectives)]
-            perspective_idx += 1
+                    # 코드 품질
+                    ('TODO', '미완성 코드'),
+                    ('FIXME', '수정 필요 코드'),
+                    ('print(', '디버그 코드 잔존'),
+                    ('console.log', '디버그 코드 잔존'),
+                ]
 
-            line_comment_prompts = []
-            for change in significant_changes[:MAX_LINE_COMMENTS_PER_FILE]: # 설정값 사용 / 파일당 최대 N개 라인 코멘트
+                for pattern, issue_type in critical_patterns:
+                    if pattern.lower() in code_line.lower():
+                        critical_changes.append({
+                            'line': current_line_number,
+                            'code': code_line,
+                            'issue_type': issue_type,
+                            'pattern': pattern
+                        })
+                        break
 
-                # 언어 특화적 힌트 추가 (예시)
-                lang_specific_hint = ""
-                if file_extension == "py":
-                    lang_specific_hint = "Python 코드의 경우 PEP 8 스타일 가이드 및 Pythonic한 접근 방식을 고려해주세요."
-                elif file_extension == "js":
-                    lang_specific_hint = "JavaScript 코드의 경우 모범 사례(예: ES6+ 문법, 비동기 처리)를 고려해주세요."
-                elif file_extension == "java":
-                    lang_specific_hint = "Java 코드의 경우 객체 지향 설계 원칙 및 일반적인 코딩 컨벤션을 고려해주세요."
+                current_line_number += 1
+            elif line.startswith(' '):
+                current_line_number += 1
 
-                line_prompt = f"""당신은 시니어 개발자입니다. 다음 코드 변경에 대해 **"{current_perspective}" 관점**에서 전문적인 피드백을 제공해주세요.
+        # 중요한 이슈에 대해서만 AI 댓글 생성
+        for change in critical_changes[:3]:  # 파일당 최대 3개의 중요 이슈만
+            try:
+                prompt = f"""당신은 시니어 개발자입니다. 다음 코드에서 발견된 중요한 이슈에 대해 구체적인 피드백을 제공해주세요.
 
-**파일**: `{filename}` (라인: {change['file_line_number']}, 언어: {file_extension})
+**파일**: `{filename}` (라인: {change['line']})
 **PR 요구사항**: {requirements}
-**코드 컨텍스트**: `{change['context_info']}`
+**감지된 이슈**: {change['issue_type']}
 
-**변경된 코드**:
-```{file_extension}
+**문제가 될 수 있는 코드**:
+```
 {change['code']}
 ```
 
 **분석 지침**:
-1. **Before vs After**: 이 라인이 변경되기 전과 후의 차이점과 그 이유 분석
-2. **코드 품질**: 가독성, 성능, 유지보수성, 보안 관점에서 평가
-3. **언어별 특성**: {file_extension} 언어의 모범 사례와 관례 준수 여부
-4. **요구사항 연관성**: PR 요구사항과 이 변경의 연관성
-5. **구체적 제안**: 문제가 있다면 정확한 개선 방법 제시
+1. **구체적 문제점**: 이 코드가 왜 문제가 될 수 있는지 명확히 설명
+2. **보안/성능/품질 영향**: 실제 운영 환경에서 발생할 수 있는 문제들
+3. **구체적 해결방안**: 정확한 코드 예시와 함께 개선 방법 제시
 
 **출력 형식**:
-- 100-150자 내외로 충분히 상세하게 작성
-- 실제 코드를 인용하여 구체적으로 설명
-- "{current_perspective}" 관점에 맞는 톤으로 작성
+- 80-120자 내외로 핵심만 간결하게
+- 문제점과 해결책을 모두 포함
+- 실제 코드 예시 제공
 
-**관점별 가이드**:
-- positive: 잘된 점과 장점을 구체적으로 칭찬
-- neutral: 트레이드오프와 고려사항을 객관적으로 분석
-- critical: 문제점과 개선방안을 명확하게 제시
-
-{lang_specific_hint}
+예시: "🚨 보안 위험: 하드코딩된 API 키가 노출됩니다. `os.getenv('API_KEY')` 또는 환경변수로 변경하세요."
 
 피드백:"""
-                line_comment_prompts.append({
-                    "prompt": line_prompt,
+
+                response = await llm.ainvoke([SystemMessage(content=prompt)])
+                comment_text = response.content.strip()
+
+                if comment_text and not comment_text.lower().startswith("피드백:"):
+                    critical_comments.append({
+                        "path": filename,
+                        "line": change['line'],
+                        "body": f"🚨 **{change['issue_type']}**\n\n{comment_text}"
+                    })
+
+            except Exception as e:
+                _LOGGER.error(f"중요 이슈 댓글 생성 실패 ({filename} L{change['line']}): {str(e)}")
+                critical_comments.append({
                     "path": filename,
-                    "line": change['file_line_number']
+                    "line": change['line'],
+                    "body": f"🚨 **{change['issue_type']}**: `{change['code'][:50]}...` - 검토 필요"
                 })
 
-            for item in line_comment_prompts:
-                try:
-                    response = await llm.ainvoke([SystemMessage(content=item["prompt"])])
-                    ai_comment_text = response.content.strip()
-
-                    if ai_comment_text:
-                        # AI가 생성한 피드백에서 "피드백:" 같은 부분을 제거할 수 있다면 추가
-                        if ai_comment_text.lower().startswith("피드백:"):
-                            ai_comment_text = ai_comment_text[len("피드백:"):].strip()
-
-                        line_comments.append({
-                            "path": item["path"],
-                            "line": item["line"],
-                            "body": ai_comment_text
-                        })
-                except Exception as e:
-                    _LOGGER.error(f"AI 라인 코멘트 생성 실패 ({item['path']} L{item['line']}): {str(e)}")
-                    original_code = next((c['code'] for c in significant_changes if c['file_line_number'] == item['line']), "")
-                    line_comments.append({
-                        "path": item["path"],
-                        "line": item["line"],
-                        "body": f"코드 변경 감지: ```{original_code[:50]}...``` (AI 분석 중 오류: {str(e)[:30]})"
-                    })
-    _LOGGER.info(f"생성된 AI 인라인 코멘트 수: {len(line_comments)}")
-    return line_comments
+    _LOGGER.info(f"생성된 중요 이슈 댓글: {len(critical_comments)}개")
+    return critical_comments
