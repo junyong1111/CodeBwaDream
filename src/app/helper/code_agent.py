@@ -423,7 +423,10 @@ def extract_requirements_from_pr(payload):
     pr = payload.get("pull_request", {})
 
     title = pr.get("title", "").strip()
-    body = pr.get("body", "").strip() or ""
+    # body가 None인 경우를 안전하게 처리
+    body = pr.get("body") or ""
+    if body:
+        body = body.strip()
 
     # 제목은 필수적으로 포함
     requirements = f"**PR 제목**: {title}\n\n"
