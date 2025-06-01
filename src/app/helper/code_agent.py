@@ -412,17 +412,10 @@ async def generate_reviewer_feedback_with_ai(project_info, files, repo_name, tok
     # AI 분석 실행 (모든 분석을 AI가 담당)
     ai_reviews = await analyze_files_with_ai(files, project_info, repo_name, token, requirements)
 
-    # 긍정 리뷰 ("봐")
-    positive_review = f"""## ✅ 봐 (긍정적 시각)
-{ai_reviews.get('positive', '피드백 생성 중 오류 발생')}"""
-
-    # 중립 리뷰 ("드")
-    neutral_review = f"""## ⚖️ 드 (분석적 시각)
-{ai_reviews.get('neutral', '피드백 생성 중 오류 발생')}"""
-
-    # 부정 리뷰 ("림")
-    critical_review = f"""## 🚨 림 (개선 관점)
-{ai_reviews.get('critical', '피드백 생성 중 오류 발생')}"""
+    # 리뷰 타이틀 중복 제거: prompt에서 이미 제목이 포함되어 있으므로 여기서는 내용만 가져옴
+    positive_review = ai_reviews.get('positive', '피드백 생성 중 오류 발생')
+    neutral_review = ai_reviews.get('neutral', '피드백 생성 중 오류 발생')
+    critical_review = ai_reviews.get('critical', '피드백 생성 중 오류 발생')
 
     return {
         "positive": positive_review,
@@ -430,9 +423,174 @@ async def generate_reviewer_feedback_with_ai(project_info, files, repo_name, tok
         "critical": critical_review
     }
 
+# 각 파일별 짧은 피드백 댓글 생성 함수 추가
+async def generate_file_specific_comments(files, requirements):
+    """각 파일의 변경사항에 대한 세부적인 라인별 피드백 댓글 생성"""
+    if not llm:
+        return []
+
+    file_comments = []
+
+    for file in files[:MAX_FILES_TO_ANALYZE]:
+        filename = file.get("filename", "")
+        patch = file.get("patch", "")
+        additions = file.get("additions", 0)
+        deletions = file.get("deletions", 0)
+        status = file.get("status", "modified")
+
+        if not patch and status != "added":
+            continue
+
+        # 너무 작은 변경사항은 제외
+        if additions + deletions < 2:
+            continue
+
+        try:
+            # 변경된 라인들을 그룹별로 분석
+            change_groups = []
+            lines = patch.split('\n')
+            current_line_number = 0
+            current_group = []
+            current_group_start_line = 0
+
+            for line in lines:
+                if line.startswith('@@'):
+                    # 이전 그룹이 있으면 저장
+                    if current_group:
+                        change_groups.append({
+                            'start_line': current_group_start_line,
+                            'lines': current_group[:],
+                            'context': ''
+                        })
+                        current_group = []
+
+                    # 새로운 섹션 시작
+                    import re
+                    match = re.search(r'\+(\d+)', line)
+                    if match:
+                        current_line_number = int(match.group(1))
+                    continue
+
+                if line.startswith('+') and not line.startswith('+++'):
+                    if not current_group:  # 새 그룹 시작
+                        current_group_start_line = current_line_number
+                    current_group.append(line[1:])  # + 제거
+                    current_line_number += 1
+                elif line.startswith('-') and not line.startswith('---'):
+                    if not current_group:  # 새 그룹 시작
+                        current_group_start_line = current_line_number
+                    current_group.append(f"[제거됨] {line[1:]}")
+                elif line.startswith(' '):
+                    # 컨텍스트 라인 - 그룹이 있으면 종료하고 저장
+                    if current_group:
+                        change_groups.append({
+                            'start_line': current_group_start_line,
+                            'lines': current_group[:],
+                            'context': line[1:] if len(line) > 1 else ''
+                        })
+                        current_group = []
+                    current_line_number += 1
+
+            # 마지막 그룹 저장
+            if current_group:
+                change_groups.append({
+                    'start_line': current_group_start_line,
+                    'lines': current_group[:],
+                    'context': ''
+                })
+
+            # 각 변경 그룹별로 개별 댓글 생성
+            for i, group in enumerate(change_groups[:5]):  # 최대 5개 그룹만
+                if not group['lines']:
+                    continue
+
+                # 의미있는 코드 변경만 필터링
+                meaningful_lines = []
+                for line in group['lines']:
+                    line_clean = line.strip()
+                    if (line_clean and
+                        len(line_clean) > 2 and
+                        not line_clean.startswith(('#', '//', '/*', '*', '{', '}', '(', ')', ';', ',')) and
+                        not line_clean in ['', '{', '}', '(', ')', ';', ',']):
+                        meaningful_lines.append(line)
+
+                if not meaningful_lines:
+                    continue
+
+                # 변경된 코드 내용
+                code_snippet = '\n'.join(meaningful_lines[:3])  # 최대 3줄만
+
+                # 라인별 세부 피드백 프롬프트
+                prompt = f"""당신은 시니어 개발자입니다. 다음 특정 코드 변경사항에 대해 간결하고 구체적인 피드백을 제공해주세요.
+
+**PR 요구사항**: {requirements}
+**파일**: `{filename}` (라인 {group['start_line']} 근처)
+
+**변경된 코드**:
+```
+{code_snippet}
+```
+
+**지침**:
+1. 50-80자 내외로 핵심만 간결하게
+2. 이 특정 변경사항의 장점, 개선점, 또는 주의사항 중 하나에 집중
+3. 파일 확장자와 코드 내용을 보고 언어/프레임워크 특화 피드백
+4. 구체적이고 실용적인 조언
+
+**출력 형식**:
+이모지 + 핵심 피드백 (기술적 용어 포함)
+
+**언어별 예시**:
+- Python: ✅ 비동기 처리 좋습니다! async/await으로 성능 향상됩니다.
+- JavaScript: 🚀 ES6 구조분해할당으로 코드가 깔끔해졌네요.
+- JSON: ⚙️ 설정값 업데이트로 개발환경이 개선되었습니다.
+- HTML: 🎨 시맨틱 태그 사용으로 접근성이 향상되었습니다.
+
+피드백:"""
+
+                response = await llm.ainvoke([SystemMessage(content=prompt)])
+                feedback = response.content.strip()
+
+                # 유효한 피드백인 경우에만 추가
+                if feedback and len(feedback) > 10 and not feedback.lower().startswith("피드백:"):
+                    file_comments.append({
+                        "path": filename,
+                        "line": group['start_line'],
+                        "body": feedback
+                    })
+
+        except Exception as e:
+            _LOGGER.error(f"파일별 피드백 생성 실패 ({filename}): {str(e)}")
+            # 간단한 fallback 댓글
+            first_line = 1
+            lines = patch.split('\n')
+            current_line_number = 0
+
+            for line in lines:
+                if line.startswith('@@'):
+                    import re
+                    match = re.search(r'\+(\d+)', line)
+                    if match:
+                        current_line_number = int(match.group(1))
+                    continue
+                if line.startswith('+') and not line.startswith('+++'):
+                    first_line = current_line_number
+                    break
+                elif line.startswith(' '):
+                    current_line_number += 1
+
+            file_comments.append({
+                "path": filename,
+                "line": first_line,
+                "body": f"📝 `{filename}` 파일 변경사항 검토 완료 (+{additions}/-{deletions})"
+            })
+
+    _LOGGER.info(f"생성된 파일별 피드백 댓글: {len(file_comments)}개")
+    return file_comments
+
 # AI 기반 코드 리뷰 작성 (신규)
 async def create_code_review_with_requirements(repo_name, pr_number, files, token, project_info, requirements):
-    """AI 완전 위임 기반 코드 리뷰 작성 - 하이브리드 방식 (통합 리뷰 + 선택적 라인 댓글)"""
+    """AI 완전 위임 기반 코드 리뷰 작성 - 통합 리뷰 + 파일별 피드백"""
     url = f"https://api.github.com/repos/{repo_name}/pulls/{pr_number}/reviews"
     headers = {
         "Authorization": f"token {token}",
@@ -444,21 +602,30 @@ async def create_code_review_with_requirements(repo_name, pr_number, files, toke
 
     # 🚨 중요한 이슈만 선별적으로 라인 댓글 생성
     critical_line_comments = await generate_critical_line_comments(files, requirements)
-    _LOGGER.info(f"생성된 중요 이슈 라인 댓글: {len(critical_line_comments)}개")
 
-    # 라인 댓글 요약 정보
-    line_comment_summary = ""
+    # 📝 각 파일별 짧은 피드백 댓글 생성 (새로 추가)
+    file_specific_comments = await generate_file_specific_comments(files, requirements)
+
+    # 모든 댓글 합치기
+    all_comments = critical_line_comments + file_specific_comments
+
+    _LOGGER.info(f"생성된 댓글 - 중요 이슈: {len(critical_line_comments)}개, 파일별 피드백: {len(file_specific_comments)}개")
+
+    # 댓글 요약 정보
+    comment_summary = ""
     if critical_line_comments:
-        line_comment_summary = f"\n\n> 💡 **중요 이슈 {len(critical_line_comments)}개**를 해당 코드 라인에 직접 댓글로 표시했습니다. 보안, 성능, 품질 문제 중심으로 선별했습니다."
-    else:
-        line_comment_summary = "\n\n> ✅ **중요한 이슈 없음**: 보안, 성능, 품질 관점에서 즉시 수정이 필요한 문제는 발견되지 않았습니다."
+        comment_summary += f"\n\n> 🚨 **중요 이슈 {len(critical_line_comments)}개**를 해당 코드 라인에 직접 댓글로 표시했습니다."
+    if file_specific_comments:
+        comment_summary += f"\n\n> 💬 **파일별 피드백 {len(file_specific_comments)}개**를 각 변경사항에 댓글로 추가했습니다."
+    if not comment_summary:
+        comment_summary = "\n\n> ✅ **특별한 이슈 없음**: 전반적으로 좋은 코드 변경사항입니다."
 
-    # 전체 리뷰 본문 (AI 기반) - 통합 리뷰 + 라인 댓글 안내
+    # 전체 리뷰 본문 (AI 기반) - 제목 중복 제거
     review_body = f"""# 🤖 **AI 코드 리뷰 완료**
 
 ## 📋 **리뷰 개요**
 - **PR 요구사항**: {requirements}
-- **변경 규모**: {project_info['changes']['changed_files']}개 파일, +{project_info['changes']['additions']}/-{project_info['changes']['deletions']} 라인{line_comment_summary}
+- **변경 규모**: {project_info['changes']['changed_files']}개 파일, +{project_info['changes']['additions']}/-{project_info['changes']['deletions']} 라인{comment_summary}
 
 ---
 
@@ -479,23 +646,23 @@ async def create_code_review_with_requirements(repo_name, pr_number, files, toke
 
 ## 🎯 **리뷰 결론**
 변경된 코드에 대한 Before/After 비교 분석과 트레이드오프 검토를 완료했습니다.
-중요한 이슈는 해당 라인에 직접 댓글로 표시했으니 확인해주세요! 🚀"""
+각 파일별 상세 피드백과 중요 이슈는 해당 라인에 댓글로 확인하세요! 🚀"""
 
-    # GitHub API 리뷰 데이터 - 하이브리드 방식 (통합 리뷰 + 선택적 라인 댓글)
+    # GitHub API 리뷰 데이터
     review_data = {
         "body": review_body,
         "event": "COMMENT"
     }
 
-    # 중요한 이슈가 있을 때만 라인 댓글 추가
-    if critical_line_comments and len(critical_line_comments) > 0:
-        review_data["comments"] = critical_line_comments
+    # 댓글이 있을 때만 추가 (타입 오류 수정)
+    if all_comments:
+        review_data["comments"] = all_comments
 
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, headers=headers, json=review_data)
             response.raise_for_status()
-            _LOGGER.info(f"PR #{pr_number}에 AI 기반 하이브리드 코드 리뷰 작성 완료 (라인 댓글: {len(critical_line_comments)}개)")
+            _LOGGER.info(f"PR #{pr_number}에 AI 기반 코드 리뷰 작성 완료 (총 댓글: {len(all_comments)}개)")
             return True
     except Exception as e:
         _LOGGER.error(f"AI 코드 리뷰 작성 실패: {str(e)}")
